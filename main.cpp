@@ -8,135 +8,127 @@ extern "C" {
 
 std::string filePath(PROJECT_DIR "/test.lua");
 
-bool tableRetrieveString(lua_State* L, const char* key, std::string& buf)
+/*
+bool getString(LuaWrapper& w)
 {
-    lua_getfield(L, -1, key);
+    size_t len;
+    if (lua_isstring(w.L, -1)) {
+        const char* ptr = lua_tolstring(w.L, -1, &len);
+        w.stringBuf.assign(ptr, len);
+        return true;
+    }
 
+    return false;
+};
+
+bool getNumber(LuaWrapper& w)
+{
     bool success = false;
     size_t len;
-
-    if (lua_isstring(L, -1)) {
-        const char* ptr = lua_tolstring(L, -1, &len);
-        buf.assign(ptr, len);
+    if (lua_isstring(w.L, -1)) {
+        const char* ptr = lua_tolstring(w.L, -1, &len);
+        w.stringBuf.assign(ptr, len);
         success = true;
     }
 
-    lua_pop(L, 1);
     return success;
-}
-
-bool tableRetrieveNumber(lua_State* L, const char* key, double& val)
-{
-    lua_getfield(L, -1, key);
-
-    bool success = false;
-    if (lua_isnumber(L, -1)) {
-        val = lua_tonumber(L, -1);
-        success = true;
-    }
-
-    lua_pop(L, 1);
-
-    return success;
-}
-
-bool tableRetrieveBool(lua_State* L, const char* key, bool& val)
-{
-    lua_getfield(L, -1, key);
-
-    bool success = false;
-    if (lua_isboolean(L, -1)) {
-        val = lua_toboolean(L, -1);
-        success = true;
-    }
-
-    lua_pop(L, 1);
-
-    return success;
-}
-
-bool tableRetrieveTable(lua_State* L, const char* key)
-{
-    lua_getfield(L, -1, key);
-
-    bool success = false;
-
-    if (lua_istable(L, -1)) {
-        // val = lua_tonumber(L, -1);
-        printf("it is table\n");
-        success = true;
-    }
-
-    lua_pop(L, 1);
-
-    return success;
-}
-/*
-class LuaObject;
-typedef std::variant<double, bool, char*, LuaObject*> VariantType;
-
-class LuaObject {
-    lua_State* L;
-    VariantType var;
-    bool pushed = false;
-
-public:
-    LuaObject(lua_State* _L, const char* str)
-        : L(_L)
-    {
-        lua_getglobal(L, str);
-        pushed = true;
-    }
-
-    ~LuaObject()
-    {
-        if (pushed)
-            lua_pop(L, 1);
-    }
-
-    template <typename T>
-    T* getAs()
-    {
-        return std::get_if<T>(&var);
-    }
 };
 */
 
-typedef void (*Func)(lua_State*);
+#if 0
+#define LOG_LUA_WRAPPER(str) printf("%s\n", str);
+#else
+#define LOG_LUA_WRAPPER(str)
+#endif
 
-static std::string stringBuf;
+namespace {
+class LuaGlobal {
+    lua_State* const L;
+    bool success;
 
-bool getGlobal_impl(lua_State* L, const char* str, Func f)
-{
-    bool success = lua_getglobal(L, str);
-    f(L);
-    lua_pop(L, 1);
-    return success;
-};
-
-bool getTableField_impl(lua_State* L, const char* key, Func f)
-{
-    bool success = lua_getfield(L, -1, key);
-    f(L);
-    lua_pop(L, 1);
-    return success;
-};
-
-bool getString_impl(lua_State* L)
-{
-    bool success = false;
-    size_t len;
-    if (lua_isstring(L, -1)) {
-        const char* ptr = lua_tolstring(L, -1, &len);
-        stringBuf.assign(ptr, len);
-        success = true;
+public:
+    operator bool() { return success; }
+    LuaGlobal(lua_State* ls, const char* str)
+        : L(ls)
+    {
+        LOG_LUA_WRAPPER("LuaGlobal()");
+        success = lua_getglobal(L, str);
     }
 
-    return success;
+    ~LuaGlobal()
+    {
+        lua_pop(L, 1);
+        LOG_LUA_WRAPPER("~LuaGlobal()");
+    }
 };
 
-#define GET_GLOBAL(str) getGlobal_impl(L, str, [](lua_State* L)
-#define GET_FIELD(str) getTableField_impl(L, str, [](lua_State* L)
+class LuaField {
+    lua_State* const L;
+    bool success;
+
+public:
+    operator bool() { return success; }
+    LuaField(lua_State* ls, const char* str)
+        : L(ls)
+    {
+        LOG_LUA_WRAPPER("LuaField()");
+        success = lua_getfield(L, -1, str);
+    }
+
+    ~LuaField()
+    {
+        lua_pop(L, 1);
+        LOG_LUA_WRAPPER("~LuaField()");
+    }
+};
+
+class LuaString {
+    lua_State* const L;
+    bool success = false;
+
+public:
+    operator bool() { return success; }
+    LuaString(lua_State* ls, std::string& buf)
+        : L(ls)
+    {
+        LOG_LUA_WRAPPER("LuaString()");
+        size_t len;
+        if (lua_isstring(L, -1)) {
+            const char* ptr = lua_tolstring(L, -1, &len);
+            buf.assign(ptr, len);
+            success = true;
+        }
+    }
+
+    ~LuaString()
+    {
+        LOG_LUA_WRAPPER("~LuaString()");
+    }
+};
+
+class LuaNumber {
+    lua_State* const L;
+    bool success = false;
+
+public:
+    operator bool() { return success; }
+    LuaNumber(lua_State* ls, double& f)
+        : L(ls)
+    {
+        LOG_LUA_WRAPPER("LuaNumber()");
+        size_t len;
+        if (lua_isnumber(L, -1)) {
+            f = lua_tonumber(L, -1);
+            success = true;
+        }
+    }
+
+    ~LuaNumber()
+    {
+        LOG_LUA_WRAPPER("~LuaNumber()");
+    }
+};
+} // namespace
 
 int main()
 {
@@ -148,28 +140,17 @@ int main()
     }
 
     luaL_openlibs(L);
-
-    Func a = [](lua_State* state) {};
+    std::string stringBuf;
     if (luaL_dofile(L, filePath.c_str()) == LUA_OK) {
-
-        GET_GLOBAL("player")
-        {
-            GET_FIELD("table")
-            {
-                GET_FIELD("a")
-                {
-                    if (getString_impl(L)) {
+        if (auto f = LuaGlobal(L, "player")) {
+            if (auto f = LuaField(L, "table")) {
+                if (auto f = LuaField(L, "a")) {
+                    if (auto f = LuaString(L, stringBuf)) {
                         printf("%s\n", stringBuf.c_str());
                     }
-                });
-            });
-        });
-
-        getGlobal_impl(L, "a", [](lua_State* L) {
-            if (getString_impl(L)) {
-                printf("%s\n", stringBuf.c_str());
+                }
             }
-        });
+        }
 
     } else
         std::cerr << "Lua error: " << lua_tostring(L, -1) << std::endl;
