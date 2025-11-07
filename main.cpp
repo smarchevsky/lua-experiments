@@ -1,6 +1,4 @@
-#include <functional>
 #include <iostream>
-#include <variant>
 
 extern "C" {
 #include <lauxlib.h>
@@ -104,9 +102,44 @@ public:
 };
 */
 
+typedef void (*Func)(lua_State*);
+
+static std::string stringBuf;
+
+bool getGlobal_impl(lua_State* L, const char* str, Func f)
+{
+    bool success = lua_getglobal(L, str);
+    f(L);
+    lua_pop(L, 1);
+    return success;
+};
+
+bool getTableField_impl(lua_State* L, const char* key, Func f)
+{
+    bool success = lua_getfield(L, -1, key);
+    f(L);
+    lua_pop(L, 1);
+    return success;
+};
+
+bool getString_impl(lua_State* L)
+{
+    bool success = false;
+    size_t len;
+    if (lua_isstring(L, -1)) {
+        const char* ptr = lua_tolstring(L, -1, &len);
+        stringBuf.assign(ptr, len);
+        success = true;
+    }
+
+    return success;
+};
+
+#define GET_GLOBAL(str) getGlobal_impl(L, str, [](lua_State* L)
+#define GET_FIELD(str) getTableField_impl(L, str, [](lua_State* L)
+
 int main()
 {
-
     lua_State* L = luaL_newstate();
 
     if (L == NULL) {
@@ -116,47 +149,24 @@ int main()
 
     luaL_openlibs(L);
 
+    Func a = [](lua_State* state) {};
     if (luaL_dofile(L, filePath.c_str()) == LUA_OK) {
 
-        std::string stringBuf;
-        auto getGlobal = [&](const char* str, std::function<void()> f) {
-            bool success = lua_getglobal(L, str);
-            f();
-            lua_pop(L, 1);
-            return success;
-        };
-
-        auto getTableField = [&](const char* key, std::function<void()> f) {
-            bool success = lua_getfield(L, -1, key);
-            f();
-            lua_pop(L, 1);
-            return success;
-        };
-
-        auto getString = [&]() {
-            bool success = false;
-            size_t len;
-            if (lua_isstring(L, -1)) {
-                const char* ptr = lua_tolstring(L, -1, &len);
-                stringBuf.assign(ptr, len);
-                success = true;
-            }
-
-            return success;
-        };
-
-        getGlobal("player", [&]() {
-            getTableField("table", [&]() {
-                getTableField("a", [&]() {
-                    if (getString()) {
+        GET_GLOBAL("player")
+        {
+            GET_FIELD("table")
+            {
+                GET_FIELD("a")
+                {
+                    if (getString_impl(L)) {
                         printf("%s\n", stringBuf.c_str());
                     }
                 });
             });
         });
 
-        getGlobal("a", [&]() {
-            if (getString()) {
+        getGlobal_impl(L, "a", [](lua_State* L) {
+            if (getString_impl(L)) {
                 printf("%s\n", stringBuf.c_str());
             }
         });
