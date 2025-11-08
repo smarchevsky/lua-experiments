@@ -2,6 +2,7 @@
 #include <iostream>
 
 #include <glm/glm.hpp>
+#include <glm/gtc/quaternion.hpp>
 
 extern "C" {
 #include <lauxlib.h>
@@ -110,8 +111,8 @@ typedef float LuaFloat;
 struct vec3 : public glm::vec<3, LuaFloat, glm::defaultp> {
     vec3() { }
     vec3(LuaFloat a) { x = y = z = a; }
-    vec3(const glm::vec<3, LuaFloat, glm::defaultp>& v) { x = v.x, y = v.y, z = v.z; }
     vec3(LuaFloat _x, LuaFloat _y, LuaFloat _z) { x = _x, y = _y, z = _z; }
+    vec3(const glm::vec<3, LuaFloat, glm::defaultp>& v) { x = v.x, y = v.y, z = v.z; }
     vec3(const vec3& rhs) = default;
 };
 
@@ -121,7 +122,9 @@ int lua_newVec3(lua_State* L)
     LuaFloat y = (LuaFloat)luaL_checknumber(L, 2);
     LuaFloat z = (LuaFloat)luaL_checknumber(L, 3);
     vec3* v = (vec3*)lua_newuserdata(L, sizeof(vec3));
+
     *v = vec3(x, y, z);
+
     luaL_getmetatable(L, "vec3Meta");
     lua_setmetatable(L, -2);
     return 1;
@@ -131,9 +134,7 @@ int lua_vec3_index_getter(lua_State* L)
 {
     vec3* v;
     v = (vec3*)luaL_checkudata(L, 1, "vec3Meta");
-
     const char* key = luaL_checkstring(L, 2);
-
     if (strcmp(key, "x") == 0)
         lua_pushnumber(L, v->x);
     else if (strcmp(key, "y") == 0)
@@ -150,17 +151,14 @@ int lua_vec3_index_setter(lua_State* L)
 {
     vec3* v;
     v = (vec3*)luaL_checkudata(L, 1, "vec3Meta");
-
     const char* key = luaL_checkstring(L, 2);
     LuaFloat value = (LuaFloat)luaL_checknumber(L, 3);
-
     if (strcmp(key, "x") == 0)
         v->x = value;
     else if (strcmp(key, "y") == 0)
         v->y = value;
     else if (strcmp(key, "z") == 0)
         v->z = value;
-
     return 0;
 }
 
@@ -168,12 +166,9 @@ int lua_vec3_cross(lua_State* L)
 {
     vec3* a = (vec3*)luaL_checkudata(L, 1, "vec3Meta");
     vec3* b = (vec3*)luaL_checkudata(L, 2, "vec3Meta");
-
     vec3* result = (vec3*)lua_newuserdata(L, sizeof(vec3));
 
-    result->x = a->y * b->z - b->y * a->z;
-    result->y = a->z * b->x - b->z * a->x,
-    result->z = a->x * b->y - b->x * a->y;
+    *result = glm::cross(*a, *b);
 
     luaL_getmetatable(L, "vec3Meta");
     lua_setmetatable(L, -2);
@@ -186,6 +181,7 @@ int lua_vec3_dot(lua_State* L)
     vec3* b = (vec3*)luaL_checkudata(L, 2, "vec3Meta");
 
     LuaFloat dot = a->x * b->x + a->y * b->y + a->z * b->z;
+
     lua_pushnumber(L, dot);
     return 1;
 }
@@ -212,7 +208,7 @@ int lua_BinaryFuncVec3Vec3(lua_State* L, BinaryFuncVec3Vec3 func)
         vec3* b = (vec3*)luaL_checkudata(L, 2, "vec3Meta");
         result = func(a, *b);
     } else {
-        return luaL_error(L, "Invalid operands for vec3 addition");
+        return luaL_error(L, "Invalid operands for vec3 operations");
     }
 
     vec3* out = (vec3*)lua_newuserdata(L, sizeof(vec3));
@@ -222,65 +218,141 @@ int lua_BinaryFuncVec3Vec3(lua_State* L, BinaryFuncVec3Vec3 func)
     lua_setmetatable(L, -2);
     return 1;
 }
-int lua_vec3_add(lua_State* L)
-{
-    return lua_BinaryFuncVec3Vec3(L, [](const vec3& a, const vec3& b) -> vec3 { return a + b; });
-}
 
-int lua_vec3_sub(lua_State* L)
-{
-    return lua_BinaryFuncVec3Vec3(L, [](const vec3& a, const vec3& b) -> vec3 { return a - b; });
-}
-
-int lua_vec3_mul(lua_State* L)
-{
-    return lua_BinaryFuncVec3Vec3(L, [](const vec3& a, const vec3& b) -> vec3 { return a * b; });
-}
-
-int lua_vec3_div(lua_State* L)
-{
-    return lua_BinaryFuncVec3Vec3(L, [](const vec3& a, const vec3& b) -> vec3 { return a / b; });
-}
+// clang-format off
+int lua_vec3_add(lua_State* L) { return lua_BinaryFuncVec3Vec3(L, [](const vec3& a, const vec3& b) -> vec3 { return a + b; }); }
+int lua_vec3_sub(lua_State* L) { return lua_BinaryFuncVec3Vec3(L, [](const vec3& a, const vec3& b) -> vec3 { return a - b; }); }
+int lua_vec3_mul(lua_State* L) { return lua_BinaryFuncVec3Vec3(L, [](const vec3& a, const vec3& b) -> vec3 { return a * b; }); }
+int lua_vec3_div(lua_State* L) { return lua_BinaryFuncVec3Vec3(L, [](const vec3& a, const vec3& b) -> vec3 { return a / b; }); }
+// clang-format on
 
 int lua_vec3_tostring(lua_State* L)
 {
     vec3* v = (vec3*)luaL_checkudata(L, 1, "vec3Meta");
-    lua_pushfstring(L, "vec3(%f, %f, %f)", v->x, v->y, v->z);
+    lua_pushfstring(L, "vec3(%f, %f, %f)", (double)v->x, (double)v->y, (double)v->z);
     return 1;
 }
 
-void registervec3(lua_State* L)
+//
+// QUAT
+//
+
+struct quat : public glm::qua<LuaFloat, glm::defaultp> {
+    quat() { }
+    quat(LuaFloat _x, LuaFloat _y, LuaFloat _z, LuaFloat _w) { x = _x, y = _y, z = _z, w = _w; }
+    quat(const glm::qua<LuaFloat, glm::defaultp>& q) { x = q.x, y = q.y, z = q.z, w = q.w; }
+};
+
+int lua_new_quat(lua_State* L)
 {
-    luaL_newmetatable(L, "vec3Meta");
+    quat result;
+    result.x = (LuaFloat)luaL_checknumber(L, 1);
+    result.y = (LuaFloat)luaL_checknumber(L, 2);
+    result.z = (LuaFloat)luaL_checknumber(L, 3);
+    result.w = (LuaFloat)luaL_checknumber(L, 3);
 
-    // MATH
+    quat* v = (quat*)lua_newuserdata(L, sizeof(quat));
 
-    lua_pushcfunction(L, lua_vec3_add);
-    lua_setfield(L, -2, "__add");
-    lua_pushcfunction(L, lua_vec3_sub);
-    lua_setfield(L, -2, "__sub");
-    lua_pushcfunction(L, lua_vec3_mul);
-    lua_setfield(L, -2, "__mul");
-    lua_pushcfunction(L, lua_vec3_div);
-    lua_setfield(L, -2, "__div");
+    *v = result;
+    luaL_getmetatable(L, "quatMeta");
+    lua_setmetatable(L, -2);
+    return 1;
+}
 
-    lua_pushcfunction(L, lua_vec3_tostring);
-    lua_setfield(L, -2, "__tostring");
+int lua_quat_mul(lua_State* L)
+{
+    quat* a = (quat*)luaL_checkudata(L, 1, "quatMeta");
+    quat* b = (quat*)luaL_checkudata(L, 2, "quatMeta");
+    quat* result = (quat*)lua_newuserdata(L, sizeof(quat));
 
-    // SUBSCRIPT
+    *result = glm::normalize(*a * *b);
 
-    lua_pushcfunction(L, lua_vec3_index_getter);
-    lua_setfield(L, -2, "__index");
-    lua_pushcfunction(L, lua_vec3_index_setter);
-    lua_setfield(L, -2, "__newindex");
+    luaL_getmetatable(L, "quatMeta");
+    lua_setmetatable(L, -2);
+    return 1;
+}
 
-    lua_pop(L, 1); // pop metatable
+int lua_quat_angle_axis(lua_State* L)
+{
+    quat result;
 
-    // GENERAL FUNCTIONS
+    // if (lua_isnumber(L, 1) && luaL_testudata(L, 2, "vec3Meta")) {
+    LuaFloat y = (LuaFloat)luaL_checknumber(L, 1);
+    vec3* a = (vec3*)luaL_checkudata(L, 2, "vec3Meta");
+    result = glm::angleAxis(y, glm::normalize(*a));
 
+    quat* v = (quat*)lua_newuserdata(L, sizeof(quat));
+
+    *v = result;
+
+    luaL_getmetatable(L, "quatMeta");
+    lua_setmetatable(L, -2);
+    return 1;
+}
+
+int lua_quat_rotate_vec3(lua_State* L)
+{
+    quat* q = (quat*)luaL_checkudata(L, 1, "quatMeta");
+    vec3* v = (vec3*)luaL_checkudata(L, 2, "vec3Meta");
+    vec3* result = (vec3*)lua_newuserdata(L, sizeof(vec3));
+
+    *result = *q * *v;
+
+    luaL_getmetatable(L, "vec3Meta");
+    lua_setmetatable(L, -2);
+    return 1;
+}
+
+int lua_quat_tostring(lua_State* L)
+{
+    quat* q = (quat*)luaL_checkudata(L, 1, "quatMeta");
+    lua_pushfstring(L, "quat(%f, %f, %f, %f)", (double)q->x, (double)q->y, (double)q->z, (double)q->w);
+    return 1;
+}
+
+void registerMathFunctions(lua_State* L)
+{
+    { // VEC3
+        luaL_newmetatable(L, "vec3Meta");
+
+        lua_pushcfunction(L, lua_vec3_add);
+        lua_setfield(L, -2, "__add");
+        lua_pushcfunction(L, lua_vec3_sub);
+        lua_setfield(L, -2, "__sub");
+        lua_pushcfunction(L, lua_vec3_mul);
+        lua_setfield(L, -2, "__mul");
+        lua_pushcfunction(L, lua_vec3_div);
+        lua_setfield(L, -2, "__div");
+        lua_pushcfunction(L, lua_vec3_tostring);
+        lua_setfield(L, -2, "__tostring");
+
+        // SUBSCRIPT
+        lua_pushcfunction(L, lua_vec3_index_getter);
+        lua_setfield(L, -2, "__index");
+        lua_pushcfunction(L, lua_vec3_index_setter);
+        lua_setfield(L, -2, "__newindex");
+
+        lua_pop(L, 1);
+    }
+
+    { // QUAT
+        luaL_newmetatable(L, "quatMeta");
+        lua_pushcfunction(L, lua_quat_mul);
+        lua_setfield(L, -2, "__mul");
+        lua_pushcfunction(L, lua_quat_tostring);
+        lua_setfield(L, -2, "__tostring");
+        lua_pop(L, 1);
+    }
+
+    // GENERAL FUNCTIONS VEC3
     lua_register(L, "vec3", lua_newVec3);
     lua_register(L, "dot", lua_vec3_dot);
     lua_register(L, "cross", lua_vec3_cross);
+
+    // GENERAL FUNCTIONS QUAT
+    lua_register(L, "quat", lua_new_quat);
+    lua_register(L, "quatAngleAxis", lua_quat_angle_axis);
+    lua_register(L, "quatRotateVec", lua_quat_rotate_vec3);
 }
 } // namespace
 
@@ -288,7 +360,7 @@ int main()
 {
     lua_State* L = luaL_newstate();
     luaL_openlibs(L);
-    registervec3(L);
+    registerMathFunctions(L);
 
     if (L == NULL) {
         std::cerr << "Failed to create Lua state." << std::endl;
