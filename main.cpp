@@ -246,59 +246,87 @@ struct quat : public glm::qua<LuaFloat, glm::defaultp> {
 int lua_new_quat(lua_State* L)
 {
     quat result;
-    result.x = (LuaFloat)luaL_checknumber(L, 1);
-    result.y = (LuaFloat)luaL_checknumber(L, 2);
-    result.z = (LuaFloat)luaL_checknumber(L, 3);
-    result.w = (LuaFloat)luaL_checknumber(L, 3);
+
+    if (lua_isnumber(L, 1) && luaL_testudata(L, 2, "vec3Meta")) {
+        LuaFloat y = (LuaFloat)luaL_checknumber(L, 1);
+        vec3* a = (vec3*)luaL_checkudata(L, 2, "vec3Meta");
+        result = glm::angleAxis(y, glm::normalize(*a));
+
+    } else {
+        result.x = (LuaFloat)luaL_checknumber(L, 1);
+        result.y = (LuaFloat)luaL_checknumber(L, 2);
+        result.z = (LuaFloat)luaL_checknumber(L, 3);
+        result.w = (LuaFloat)luaL_checknumber(L, 4);
+        result = glm::normalize(result);
+    }
 
     quat* v = (quat*)lua_newuserdata(L, sizeof(quat));
-
     *v = result;
+
     luaL_getmetatable(L, "quatMeta");
+    lua_setmetatable(L, -2);
+    return 1;
+}
+
+int lua_normalize(lua_State* L)
+{
+    if (luaL_testudata(L, 1, "vec3Meta")) {
+        vec3* a = (vec3*)luaL_checkudata(L, 1, "vec3Meta");
+        vec3* result = (vec3*)lua_newuserdata(L, sizeof(vec3));
+        *result = glm::normalize(*a);
+        luaL_getmetatable(L, "vec3Meta");
+
+    } else if (luaL_testudata(L, 1, "quatMeta")) {
+        quat* a = (quat*)luaL_checkudata(L, 1, "quatMeta");
+        quat* result = (quat*)lua_newuserdata(L, sizeof(quat));
+        *result = glm::normalize(*a);
+        luaL_getmetatable(L, "quatMeta");
+
+    } else {
+        return luaL_error(L, "Correct operands for normalize: quat, vec3");
+    }
+
+    lua_setmetatable(L, -2);
+    return 1;
+}
+
+int lua_inverse(lua_State* L)
+{
+    quat* a = (quat*)luaL_checkudata(L, 1, "quatMeta");
+    quat* result = (quat*)lua_newuserdata(L, sizeof(quat));
+    *result = glm::inverse(*a);
+    luaL_getmetatable(L, "quatMeta");
+
     lua_setmetatable(L, -2);
     return 1;
 }
 
 int lua_quat_mul(lua_State* L)
 {
-    quat* a = (quat*)luaL_checkudata(L, 1, "quatMeta");
-    quat* b = (quat*)luaL_checkudata(L, 2, "quatMeta");
-    quat* result = (quat*)lua_newuserdata(L, sizeof(quat));
+    const char* errorMsg = "Correct operands: (quat = quat * quat) or (vec = quat * vec)";
 
-    *result = glm::normalize(*a * *b);
+    if (luaL_testudata(L, 1, "quatMeta")) {
+        quat* q = (quat*)luaL_checkudata(L, 1, "quatMeta");
 
-    luaL_getmetatable(L, "quatMeta");
-    lua_setmetatable(L, -2);
-    return 1;
-}
+        if (luaL_testudata(L, 2, "vec3Meta")) { // vec = quat * vec
+            vec3* v = (vec3*)luaL_checkudata(L, 2, "vec3Meta");
+            vec3* result = (vec3*)lua_newuserdata(L, sizeof(vec3));
+            *result = *q * *v;
+            luaL_getmetatable(L, "vec3Meta");
+            errorMsg = nullptr;
 
-int lua_quat_angle_axis(lua_State* L)
-{
-    quat result;
+        } else if (luaL_testudata(L, 2, "quatMeta")) { // quat = quat * quat
+            quat* b = (quat*)luaL_checkudata(L, 2, "quatMeta");
+            quat* result = (quat*)lua_newuserdata(L, sizeof(quat));
+            *result = glm::normalize(*q * *b);
+            luaL_getmetatable(L, "quatMeta");
+            errorMsg = nullptr;
+        }
+    }
 
-    // if (lua_isnumber(L, 1) && luaL_testudata(L, 2, "vec3Meta")) {
-    LuaFloat y = (LuaFloat)luaL_checknumber(L, 1);
-    vec3* a = (vec3*)luaL_checkudata(L, 2, "vec3Meta");
-    result = glm::angleAxis(y, glm::normalize(*a));
+    if (errorMsg)
+        return luaL_error(L, errorMsg);
 
-    quat* v = (quat*)lua_newuserdata(L, sizeof(quat));
-
-    *v = result;
-
-    luaL_getmetatable(L, "quatMeta");
-    lua_setmetatable(L, -2);
-    return 1;
-}
-
-int lua_quat_rotate_vec3(lua_State* L)
-{
-    quat* q = (quat*)luaL_checkudata(L, 1, "quatMeta");
-    vec3* v = (vec3*)luaL_checkudata(L, 2, "vec3Meta");
-    vec3* result = (vec3*)lua_newuserdata(L, sizeof(vec3));
-
-    *result = *q * *v;
-
-    luaL_getmetatable(L, "vec3Meta");
     lua_setmetatable(L, -2);
     return 1;
 }
@@ -351,8 +379,8 @@ void registerMathFunctions(lua_State* L)
 
     // GENERAL FUNCTIONS QUAT
     lua_register(L, "quat", lua_new_quat);
-    lua_register(L, "quatAngleAxis", lua_quat_angle_axis);
-    lua_register(L, "quatRotateVec", lua_quat_rotate_vec3);
+    lua_register(L, "normalize", lua_normalize);
+    lua_register(L, "inverse", lua_inverse);
 }
 } // namespace
 

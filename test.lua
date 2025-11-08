@@ -18,6 +18,8 @@ b = vec3(4, 5, 6)
 
 c = a + b
 
-q1 = quatAngleAxis(0.01, a)
-q2 = quatAngleAxis(0.04, b)
-print(quatRotateVec(q1, b))
+q1 = quat(1, 2, 3, 4)
+q2 = quat(0.04, b)
+
+print(normalize(q1))
+print(inverse(normalize(q1)))
