@@ -1,4 +1,4 @@
-
+--[[
 player2 = {}
 player2["Name"] = "Sonya"
 player2["age"] = "222"
@@ -9,8 +9,11 @@ player = { Name = 34,
 
 table = { t1 = "34", t2 = "hello world", t3 = true }
 a = 3 + 4
+]]
 
 
+a = vec3(1.0, 2, 3)
+b = vec3(4, 5, 6)
+d = dot(a,b)
 
---local v1_array = { 10.5, 5.0, 2.0 }
---print("X component:", v1_array[1]) -- Output: X component: 10.5
+print(a.x)
