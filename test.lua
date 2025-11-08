@@ -12,8 +12,9 @@ a = 3 + 4
 ]]
 
 
-a = vec3(1.0, 2, 3)
+a = vec3(1, 2, 3)
 b = vec3(4, 5, 6)
-d = dot(a,b)
 
-print(a.x)
+
+c = a + b
+print(a - b)
