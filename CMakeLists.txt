@@ -7,7 +7,9 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 add_definitions(-DPROJECT_DIR="${CMAKE_SOURCE_DIR}")
 
-add_executable(lua-experiments main.cpp)
+add_executable(lua-experiments main.cpp
+    cpp_math.h
+    cpp_math.cpp)
 
 target_link_libraries(lua-experiments lua)
 
