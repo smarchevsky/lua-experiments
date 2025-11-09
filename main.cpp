@@ -108,13 +108,14 @@ public:
 
 #define LUA_GET_INPUT(type, name, index) type* name = (type*)luaL_checkudata(L, index, #type "Meta")
 #define LUA_GET_FLOAT(name, index) Float name = (Float)luaL_checknumber(L, index)
-#define LUA_GET_OUTPUT(type) type* outptr = (type*)lua_newuserdata(L, sizeof(type))
 
+#define LUA_GET_OUTPUT(type) type* outptr = (type*)lua_newuserdata(L, sizeof(type))
+#define LUA_SET_FLOAT(name) lua_pushnumber(L, name)
 //
 // VEC3
 //
 namespace {
-int lua_newVec3(lua_State* L)
+int lua_vec3_new(lua_State* L)
 {
     LUA_GET_FLOAT(x, 1);
     LUA_GET_FLOAT(y, 2);
@@ -234,7 +235,7 @@ int lua_vec3_tostring(lua_State* L)
 // QUAT
 //
 
-int lua_new_quat(lua_State* L)
+int lua_quat_new(lua_State* L)
 {
     Quat result;
 
@@ -330,6 +331,47 @@ int lua_quat_tostring(lua_State* L)
     return 1;
 }
 
+//
+// BOT
+//
+
+void pushVec3(lua_State* L, const Vec3& v)
+{
+    Vec3* u = (Vec3*)lua_newuserdata(L, sizeof(Vec3));
+    *u = v;
+    luaL_getmetatable(L, "Vec3Meta");
+    lua_setmetatable(L, -2);
+}
+
+bool callLuaProcessVecs(lua_State* L, const Vec3& a, const Vec3& b, float& out1, float& out2)
+{
+    lua_getglobal(L, "processVecs"); // push function
+
+    if (!lua_isfunction(L, -1)) {
+        lua_pop(L, 1);
+        return false;
+    }
+
+    // Push 2 Vec3 args
+    pushVec3(L, a);
+    pushVec3(L, b);
+
+    // Call: 2 args, expecting 2 returns
+    if (lua_pcall(L, 2, 2, 0) != LUA_OK) {
+        const char* err = lua_tostring(L, -1);
+        printf("Lua error: %s\n", err);
+        lua_pop(L, 1);
+        return false;
+    }
+
+    // Read return values (in reverse order)
+    out2 = (float)lua_tonumber(L, -1);
+    out1 = (float)lua_tonumber(L, -2);
+    lua_pop(L, 2);
+
+    return true;
+}
+
 void registerMathFunctions(lua_State* L)
 {
     { // VEC3
@@ -364,13 +406,16 @@ void registerMathFunctions(lua_State* L)
         lua_pop(L, 1);
     }
 
+    { // SPLINE
+    }
+
     // GENERAL FUNCTIONS VEC3
-    lua_register(L, "vec3", lua_newVec3);
+    lua_register(L, "vec3", lua_vec3_new);
+    lua_register(L, "quat", lua_quat_new);
+
     lua_register(L, "dot", lua_vec3_dot);
     lua_register(L, "cross", lua_vec3_cross);
 
-    // GENERAL FUNCTIONS QUAT
-    lua_register(L, "quat", lua_new_quat);
     // lua_register(L, "quatPitchYawRoll", lua_quatPitchYawRoll);
     lua_register(L, "normalize", lua_normalize);
     lua_register(L, "inverse", lua_inverse);
@@ -391,20 +436,37 @@ int main()
     std::string stringBuf;
     if (luaL_dofile(L, filePath.c_str()) == LUA_OK) {
 
-        if (auto f = LuaGlobal(L, "player")) {
-            if (auto f = LuaField(L, "table")) {
-                if (auto f = LuaField(L, "a")) {
-                    if (auto f = LuaString(L, stringBuf)) {
-                        printf("%s\n", stringBuf.c_str());
-                    }
-                }
-            }
+        // if (auto f = LuaGlobal(L, "player")) {
+        //     if (auto f = LuaField(L, "table")) {
+        //         if (auto f = LuaField(L, "a")) {
+        //             if (auto f = LuaString(L, stringBuf)) {
+        //                 printf("%s\n", stringBuf.c_str());
+        //             }
+        //         }
+        //     }
+        // }
+
+        // lua_getglobal(L, "executeFromCpp"); // stack: [function]
+        // lua_pushstring(L, "World"); // stack: [function, "World"]
+
+        // if (lua_pcall(L, 1, 1, 0) != LUA_OK) {
+        //     std::cerr << "Error: " << lua_tostring(L, -1) << "\n";
+        //     lua_pop(L, 1);
+        // } else {
+        //     const char* result = lua_tostring(L, -1);
+        //     std::cout << result << "\n";
+        //     lua_pop(L, 1);
+        // }
+
+        Vec3 a { 1, 2, 3 };
+        Vec3 b { 4, 5, 6 };
+
+        float dot = 0, dist = 0;
+        if (callLuaProcessVecs(L, a, b, dot, dist)) {
+            printf("dot=%.2f dist=%.2f\n", dot, dist);
         }
-        if (auto f = LuaGlobal(L, "a")) {
-            if (auto f = LuaString(L, stringBuf)) {
-                printf("%s\n", stringBuf.c_str());
-            }
-        }
+
+        /* GAME LOOP HERE */
 
     } else
         std::cerr << "Lua error: " << lua_tostring(L, -1) << std::endl;
