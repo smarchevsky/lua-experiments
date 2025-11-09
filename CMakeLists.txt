@@ -9,7 +9,8 @@ add_definitions(-DPROJECT_DIR="${CMAKE_SOURCE_DIR}")
 
 add_executable(lua-experiments main.cpp
     cpp_math.h
-    cpp_math.cpp)
+    cpp_math.cpp
+    lua_functions.h)
 
 target_link_libraries(lua-experiments lua)
 
