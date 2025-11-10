@@ -5,15 +5,15 @@
 --print(q1)
 
 
+print(roadSplineLength())
 
-
-function processVecs(a, b)
-    -- Example: return dot and distance
-    local dot = a.x * b.x + a.y * b.y + a.z * b.z
-    local dx = a.x - b.x
-    local dy = a.y - b.y
-    local dz = a.z - b.z
-    local dist = math.sqrt(dx*dx + dy*dy + dz*dz)
-    return dot, dist
-end
+--function processVecs(a, b)
+--    -- Example: return dot and distance
+--    local dot = a.x * b.x + a.y * b.y + a.z * b.z
+--    local dx = a.x - b.x
+--    local dy = a.y - b.y
+--    local dz = a.z - b.z
+--    local dist = math.sqrt(dx*dx + dy*dy + dz*dz)
+--    return dot, dist
+--end
 

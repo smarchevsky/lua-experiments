@@ -116,7 +116,7 @@ public:
 // VEC3
 //
 namespace {
-int lua_vec3_new(lua_State* L)
+int vec3_new(lua_State* L)
 {
     LUA_GET_FLOAT(x, 1);
     LUA_GET_FLOAT(y, 2);
@@ -130,7 +130,7 @@ int lua_vec3_new(lua_State* L)
     return 1;
 }
 
-int lua_vec3_index_getter(lua_State* L)
+int vec3_index_getter(lua_State* L)
 {
     LUA_GET_INPUT(Vec3, v, 1);
     const char* key = luaL_checkstring(L, 2);
@@ -146,7 +146,7 @@ int lua_vec3_index_getter(lua_State* L)
     return 1;
 }
 
-int lua_vec3_index_setter(lua_State* L)
+int vec3_index_setter(lua_State* L)
 {
     LUA_GET_INPUT(Vec3, v, 1);
     const char* key = luaL_checkstring(L, 2);
@@ -160,7 +160,7 @@ int lua_vec3_index_setter(lua_State* L)
     return 0;
 }
 
-int lua_vec3_cross(lua_State* L)
+int vec3_cross(lua_State* L)
 {
     LUA_GET_INPUT(Vec3, a, 1);
     LUA_GET_INPUT(Vec3, b, 2);
@@ -173,7 +173,7 @@ int lua_vec3_cross(lua_State* L)
     return 1;
 }
 
-int lua_vec3_dot(lua_State* L)
+int vec3_dot(lua_State* L)
 {
     LUA_GET_INPUT(Vec3, a, 1);
     LUA_GET_INPUT(Vec3, b, 2);
@@ -185,7 +185,7 @@ int lua_vec3_dot(lua_State* L)
 }
 
 typedef Vec3 (*BinaryFuncVec3Vec3)(const Vec3&, const Vec3&);
-int lua_BinaryFuncVec3Vec3(lua_State* L, BinaryFuncVec3Vec3 func)
+int binaryFuncVec3Vec3(lua_State* L, BinaryFuncVec3Vec3 func)
 {
     Vec3 result;
 
@@ -219,13 +219,13 @@ int lua_BinaryFuncVec3Vec3(lua_State* L, BinaryFuncVec3Vec3 func)
 }
 
 // clang-format off
-int lua_vec3_add(lua_State* L) { return lua_BinaryFuncVec3Vec3(L, [](const Vec3& a, const Vec3& b) -> Vec3 { return Vec3(a + b); }); }
-int lua_vec3_sub(lua_State* L) { return lua_BinaryFuncVec3Vec3(L, [](const Vec3& a, const Vec3& b) -> Vec3 { return a - b; }); }
-int lua_vec3_mul(lua_State* L) { return lua_BinaryFuncVec3Vec3(L, [](const Vec3& a, const Vec3& b) -> Vec3 { return a * b; }); }
-int lua_vec3_div(lua_State* L) { return lua_BinaryFuncVec3Vec3(L, [](const Vec3& a, const Vec3& b) -> Vec3 { return a / b; }); }
+int vec3_add(lua_State* L) { return binaryFuncVec3Vec3(L, [](const Vec3& a, const Vec3& b) -> Vec3 { return Vec3(a + b); }); }
+int vec3_sub(lua_State* L) { return binaryFuncVec3Vec3(L, [](const Vec3& a, const Vec3& b) -> Vec3 { return a - b; }); }
+int vec3_mul(lua_State* L) { return binaryFuncVec3Vec3(L, [](const Vec3& a, const Vec3& b) -> Vec3 { return a * b; }); }
+int vec3_div(lua_State* L) { return binaryFuncVec3Vec3(L, [](const Vec3& a, const Vec3& b) -> Vec3 { return a / b; }); }
 // clang-format on
 
-int lua_vec3_tostring(lua_State* L)
+int vec3_tostring(lua_State* L)
 {
     LUA_GET_INPUT(Vec3, v, 1);
     lua_pushfstring(L, "vec3(%f, %f, %f)", (double)v->x, (double)v->y, (double)v->z);
@@ -236,7 +236,7 @@ int lua_vec3_tostring(lua_State* L)
 // QUAT
 //
 
-int lua_quat_new(lua_State* L)
+int quat_new(lua_State* L)
 {
     Quat result;
 
@@ -261,7 +261,7 @@ int lua_quat_new(lua_State* L)
     return 1;
 }
 
-int lua_normalize(lua_State* L)
+int normalize(lua_State* L)
 {
     if (luaL_testudata(L, 1, "Vec3Meta")) {
         LUA_GET_INPUT(Vec3, v, 1);
@@ -283,7 +283,7 @@ int lua_normalize(lua_State* L)
     return 1;
 }
 
-int lua_inverse(lua_State* L)
+int inverse(lua_State* L)
 {
     LUA_GET_INPUT(Quat, v, 1);
     LUA_GET_OUTPUT(Quat);
@@ -294,7 +294,7 @@ int lua_inverse(lua_State* L)
     return 1;
 }
 
-int lua_quat_mul(lua_State* L)
+int quat_mul(lua_State* L)
 {
     const char* errorMsg = "Correct operands: (quat = quat * quat) or (vec = quat * vec)";
 
@@ -324,13 +324,79 @@ int lua_quat_mul(lua_State* L)
     return 1;
 }
 
-int lua_quat_tostring(lua_State* L)
+int quat_tostring(lua_State* L)
 {
     LUA_GET_INPUT(Quat, q, 1);
     lua_pushfstring(L, "quat(%f, %f, %f, %f)",
         (double)q->x, (double)q->y, (double)q->z, (double)q->w);
     return 1;
 }
+
+//
+// SPLINE
+//
+
+Spline spline;
+
+int roadSplineLength(lua_State* L)
+{
+    lua_pushnumber(L, spline.GetLength());
+    return 1;
+}
+
+int roadSplineDistanceToKey(lua_State* L)
+{
+    LUA_GET_FLOAT(distance, 1);
+
+    lua_pushnumber(L, spline.DistanceToKey(distance));
+    return 1;
+}
+
+int roadSplineKeyToDistance(lua_State* L)
+{
+    LUA_GET_FLOAT(key, 1);
+    lua_pushnumber(L, spline.KeyToDistance(key));
+    return 1;
+}
+
+int roadSplinePositionAtKey(lua_State* L)
+{
+    LUA_GET_FLOAT(key, 1);
+    LUA_GET_OUTPUT(Vec3);
+
+    *outptr = spline.GetInterpAtKey(key).getPos();
+
+    luaL_getmetatable(L, "Vec3Meta");
+    lua_setmetatable(L, -2);
+    return 1;
+}
+
+int roadSplineKeyClosestToPosition(lua_State* L)
+{
+    LUA_GET_INPUT(Vec3, v, 1);
+    lua_pushnumber(L, spline.GetKeyClosestToPosition(*v));
+    return 1;
+}
+
+int roadSplinePositionAndRotationAtKey(lua_State* L)
+{
+    float f;
+    lua_pushnumber(L, f);
+    // in float, out (vec3, quat)
+    LUA_GET_OUTPUT(Vec3);
+
+    luaL_getmetatable(L, "Vec3Meta");
+    lua_setmetatable(L, -2);
+    return 1;
+}
+
+/*
+lua_register(L, "roadSplineDistanceToKey"         lua_roadSplineDistanceToKey);
+lua_register(L, "roadSplinePositionAtKey",         lua_roadSplinePositionAtKey);
+lua_register(L, "roadSplinePositionRotationAtKey", lua_roadSplinePositionRotationAtKey);
+lua_register(L, "roadSplineKeyClosestToPosition", lua_roadSplineKeyClosestToPosition);
+
+*/
 
 //
 // BOT
@@ -376,50 +442,42 @@ bool callLuaProcessVecs(lua_State* L, const Vec3& a, const Vec3& b, float& out1,
 void registerMathFunctions(lua_State* L)
 {
     { // VEC3
+        lua_register(L, "vec3", vec3_new);
+        lua_register(L, "dot", vec3_dot);
+        lua_register(L, "cross", vec3_cross);
+
         luaL_newmetatable(L, "Vec3Meta");
-
-        lua_pushcfunction(L, lua_vec3_add);
-        lua_setfield(L, -2, "__add");
-        lua_pushcfunction(L, lua_vec3_sub);
-        lua_setfield(L, -2, "__sub");
-        lua_pushcfunction(L, lua_vec3_mul);
-        lua_setfield(L, -2, "__mul");
-        lua_pushcfunction(L, lua_vec3_div);
-        lua_setfield(L, -2, "__div");
-        lua_pushcfunction(L, lua_vec3_tostring);
-        lua_setfield(L, -2, "__tostring");
-
-        // SUBSCRIPT
-        lua_pushcfunction(L, lua_vec3_index_getter);
-        lua_setfield(L, -2, "__index");
-        lua_pushcfunction(L, lua_vec3_index_setter);
-        lua_setfield(L, -2, "__newindex");
-
+        lua_pushcfunction(L, vec3_add), lua_setfield(L, -2, "__add");
+        lua_pushcfunction(L, vec3_sub), lua_setfield(L, -2, "__sub");
+        lua_pushcfunction(L, vec3_mul), lua_setfield(L, -2, "__mul");
+        lua_pushcfunction(L, vec3_div), lua_setfield(L, -2, "__div");
+        lua_pushcfunction(L, vec3_tostring), lua_setfield(L, -2, "__tostring");
+        lua_pushcfunction(L, vec3_index_getter), lua_setfield(L, -2, "__index");
+        lua_pushcfunction(L, vec3_index_setter), lua_setfield(L, -2, "__newindex");
         lua_pop(L, 1);
     }
 
     { // QUAT
+        lua_register(L, "quat", quat_new);
+        lua_register(L, "inverse", inverse);
+
         luaL_newmetatable(L, "QuatMeta");
-        lua_pushcfunction(L, lua_quat_mul);
-        lua_setfield(L, -2, "__mul");
-        lua_pushcfunction(L, lua_quat_tostring);
-        lua_setfield(L, -2, "__tostring");
+        lua_pushcfunction(L, quat_mul), lua_setfield(L, -2, "__mul");
+        lua_pushcfunction(L, quat_tostring), lua_setfield(L, -2, "__tostring");
         lua_pop(L, 1);
     }
 
-    { // SPLINE
-    }
-
     // GENERAL FUNCTIONS VEC3
-    lua_register(L, "vec3", lua_vec3_new);
-    lua_register(L, "quat", lua_quat_new);
+    lua_register(L, "normalize", normalize);
 
-    lua_register(L, "dot", lua_vec3_dot);
-    lua_register(L, "cross", lua_vec3_cross);
-
-    // lua_register(L, "quatPitchYawRoll", lua_quatPitchYawRoll);
-    lua_register(L, "normalize", lua_normalize);
-    lua_register(L, "inverse", lua_inverse);
+    { // road spline
+        lua_register(L, "roadSplineLength", roadSplineLength);
+        lua_register(L, "roadSplineDistanceToKey", roadSplineDistanceToKey);
+        lua_register(L, "roadSplineKeyToDistance", roadSplineKeyToDistance);
+        lua_register(L, "roadSplinePositionAtKey", roadSplinePositionAtKey);
+        lua_register(L, "roadSplinePositionRotationAtKey", roadSplinePositionAndRotationAtKey);
+        lua_register(L, "roadSplineKeyClosestToPosition", roadSplineKeyClosestToPosition);
+    }
 }
 } // namespace
 #endif // LUA_FUNCTIONS_H
