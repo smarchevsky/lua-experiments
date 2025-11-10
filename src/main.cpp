@@ -85,12 +85,17 @@ void processInput(GLFWwindow* window);
 const unsigned int SCR_WIDTH = 800;
 const unsigned int SCR_HEIGHT = 600;
 
-const char* vertexShaderSource = "#version 330 core\n"
-                                 "layout (location = 0) in vec3 aPos;\n"
-                                 "void main()\n"
-                                 "{\n"
-                                 "   gl_Position = vec4(aPos.x, aPos.y, aPos.z, 1.0);\n"
-                                 "}\0";
+const char* vertexShaderSource = R"(
+#version 330 core
+layout (location = 0) in vec2 pos;
+
+out vec2 inUV;
+void main()
+{
+    gl_Position = vec4(pos.x, pos.y, 0, 1);
+    inUV = pos * vec2(1,-1);
+}
+)";
 
 int main()
 {
@@ -136,8 +141,12 @@ int main()
 
     unsigned int fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
 
+    //
+    //
     auto fragment = textFromFile(PROJECT_DIR "/shaders/shader.glsl");
     const char* fragmentChar = fragment.c_str();
+    //
+    //
 
     glShaderSource(fragmentShader, 1, &fragmentChar, NULL);
     glCompileShader(fragmentShader);
@@ -208,11 +217,7 @@ void processInput(GLFWwindow* window)
         glfwSetWindowShouldClose(window, true);
 }
 
-// glfw: whenever the window size changed (by OS or user resize) this callback function executes
-// ---------------------------------------------------------------------------------------------
 void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 {
-    // make sure the viewport matches the new window dimensions; note that width and
-    // height will be significantly larger than specified on retina displays.
     glViewport(0, 0, width, height);
 }
