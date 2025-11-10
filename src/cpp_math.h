@@ -1,6 +1,8 @@
 #ifndef CPP_MATH_H
 #define CPP_MATH_H
 
+#include "utils.h"
+
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <vector>
@@ -51,6 +53,7 @@ public:
     Float KeyToDistance(Float key) const;
     Float DistanceToKey(Float distance) const;
     Float GetLength() const { return m_splineLength; }
+    size_t GetNumSegments() const { return m_bezierPoints.size(); }
 
     BerierInterp GetInterpAtKey(Float splineKey) const;
 

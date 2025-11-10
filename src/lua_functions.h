@@ -344,10 +344,15 @@ int roadSplineLength(lua_State* L)
     return 1;
 }
 
+int roadSplineNumSegments(lua_State* L)
+{
+    lua_pushnumber(L, spline.GetNumSegments());
+    return 1;
+}
+
 int roadSplineDistanceToKey(lua_State* L)
 {
     LUA_GET_FLOAT(distance, 1);
-
     lua_pushnumber(L, spline.DistanceToKey(distance));
     return 1;
 }
@@ -390,13 +395,138 @@ int roadSplinePositionAndRotationAtKey(lua_State* L)
     return 1;
 }
 
-/*
-lua_register(L, "roadSplineDistanceToKey"         lua_roadSplineDistanceToKey);
-lua_register(L, "roadSplinePositionAtKey",         lua_roadSplinePositionAtKey);
-lua_register(L, "roadSplinePositionRotationAtKey", lua_roadSplinePositionRotationAtKey);
-lua_register(L, "roadSplineKeyClosestToPosition", lua_roadSplineKeyClosestToPosition);
+//
+// Arr2d
+//
 
-*/
+struct Arr2d {
+    int width;
+    int height;
+    float* data;
+    float& get(int x, int y)
+    {
+        return data[y * width + x];
+    }
+};
+
+// --------------------- Lua bindings ---------------------
+
+int l_Arr2d_new(lua_State* L)
+{
+    luaL_checktype(L, 1, LUA_TTABLE);
+
+    int height = luaL_len(L, 1);
+    lua_rawgeti(L, 1, 1);
+    int width = luaL_len(L, -1);
+    lua_pop(L, 1);
+
+    Arr2d* arr = (Arr2d*)lua_newuserdata(L, sizeof(Arr2d));
+    arr->width = width;
+    arr->height = height;
+    arr->data = new float[width * height];
+
+    // Fill data
+    for (int y = 0; y < height; ++y) {
+        lua_rawgeti(L, 1, y + 1);
+        for (int x = 0; x < width; ++x) {
+            lua_rawgeti(L, -1, x + 1);
+            arr->data[y * width + x] = (float)lua_tonumber(L, -1);
+            lua_pop(L, 1);
+        }
+        lua_pop(L, 1);
+    }
+
+    // Set metatable
+    luaL_getmetatable(L, "Arr2d");
+    lua_setmetatable(L, -2);
+    return 1;
+}
+
+// GC
+int l_Arr2d_gc(lua_State* L)
+{
+    Arr2d* arr = (Arr2d*)lua_touserdata(L, 1);
+    delete[] arr->data;
+    arr->data = nullptr;
+    return 0;
+}
+
+// get(x, y)
+int l_Arr2d_get(lua_State* L)
+{
+    Arr2d* arr = (Arr2d*)luaL_checkudata(L, 1, "Arr2d");
+    int x = luaL_checkinteger(L, 2) - 1;
+    int y = luaL_checkinteger(L, 3) - 1;
+    if (x < 0 || y < 0 || x >= arr->width || y >= arr->height)
+        return luaL_error(L, "index out of range");
+    lua_pushnumber(L, arr->get(x, y));
+    return 1;
+}
+
+int l_Arr2d_set(lua_State* L)
+{
+    Arr2d* arr = (Arr2d*)luaL_checkudata(L, 1, "Arr2d");
+    int x = luaL_checkinteger(L, 2) - 1;
+    int y = luaL_checkinteger(L, 3) - 1;
+    float v = (float)luaL_checknumber(L, 4);
+    if (x < 0 || y < 0 || x >= arr->width || y >= arr->height)
+        return luaL_error(L, "index out of range");
+    arr->get(x, y) = v;
+    return 0;
+}
+
+// getRow(y)
+int l_Arr2d_getRow(lua_State* L)
+{
+    Arr2d* arr = (Arr2d*)luaL_checkudata(L, 1, "Arr2d");
+    int rowIndex = luaL_checkinteger(L, 2) - 1;
+    if (rowIndex < 0 || rowIndex >= arr->height)
+        return luaL_error(L, "row out of range");
+
+    lua_createtable(L, arr->width, 0);
+    for (int x = 0; x < arr->width; ++x) {
+        lua_pushnumber(L, arr->get(x, rowIndex));
+        lua_rawseti(L, -2, x + 1);
+    }
+    return 1;
+}
+
+int l_Arr2d_getBinarySearchByCol(lua_State* L)
+{
+
+    Arr2d* array2d = (Arr2d*)luaL_checkudata(L, 1, "Arr2d");
+    int colIndex = luaL_checkinteger(L, 2) - 1;
+
+    if (array2d->width <= 0 || array2d->height <= 0)
+        return luaL_error(L, "Arr2d empty");
+
+    if (colIndex < 0 || colIndex >= array2d->width)
+        return luaL_error(L, "col out of range");
+
+    Float targetValue = luaL_checknumber(L, 3);
+
+    auto strideWidth = array2d->width;
+    auto initialOffset = colIndex;
+    auto arr = array2d->data;
+
+    std::tuple<int, int> range = BinarySearchFindBounds<Float>(
+        array2d->data, array2d->height, array2d->width, colIndex, targetValue);
+
+    // printf("%d, %d", std::get<0>(a), std::get<1>(a));
+
+    const int index0 = std::get<0>(range), index1 = std::get<1>(range);
+
+#define GET_ARR(x) arr[x * strideWidth + initialOffset]
+    Float param = normalizeRangeClamped(GET_ARR(index0), GET_ARR(index1), targetValue);
+    lua_createtable(L, array2d->width, 0);
+    for (int x = 0; x < array2d->width; ++x) {
+        lua_pushnumber(L, glm::mix(array2d->get(x, index0), array2d->get(x, index1), param));
+        lua_rawseti(L, -2, x + 1);
+    }
+
+#undef GET_ARR
+    return 1;
+}
 
 //
 // BOT
@@ -467,16 +597,35 @@ void registerMathFunctions(lua_State* L)
         lua_pop(L, 1);
     }
 
-    // GENERAL FUNCTIONS VEC3
     lua_register(L, "normalize", normalize);
 
     { // road spline
         lua_register(L, "roadSplineLength", roadSplineLength);
+        lua_register(L, "roadSplineLength", roadSplineNumSegments);
         lua_register(L, "roadSplineDistanceToKey", roadSplineDistanceToKey);
         lua_register(L, "roadSplineKeyToDistance", roadSplineKeyToDistance);
         lua_register(L, "roadSplinePositionAtKey", roadSplinePositionAtKey);
         lua_register(L, "roadSplinePositionRotationAtKey", roadSplinePositionAndRotationAtKey);
         lua_register(L, "roadSplineKeyClosestToPosition", roadSplineKeyClosestToPosition);
+    }
+
+    {
+        luaL_newmetatable(L, "Arr2d");
+
+        lua_pushcfunction(L, l_Arr2d_gc), lua_setfield(L, -2, "__gc");
+
+        // method table
+        lua_newtable(L);
+        lua_pushcfunction(L, l_Arr2d_get), lua_setfield(L, -2, "get");
+        lua_pushcfunction(L, l_Arr2d_set), lua_setfield(L, -2, "set");
+        lua_pushcfunction(L, l_Arr2d_getRow), lua_setfield(L, -2, "getRow");
+        lua_pushcfunction(L, l_Arr2d_getBinarySearchByCol), lua_setfield(L, -2, "binarySearchByCol");
+        lua_setfield(L, -2, "__index"); // metatable.__index = methods
+
+        lua_pop(L, 1); // pop metatable
+
+        // Register constructor
+        lua_register(L, "Arr2d", l_Arr2d_new);
     }
 }
 } // namespace

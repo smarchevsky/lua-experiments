@@ -4,8 +4,30 @@
 --q1 = quat(3, vec3(3,3,3))
 --print(q1)
 
+function printTable(t)
+    for i, v in ipairs(t) do io.write(v, " ") end
+    print()
+end
 
-print(roadSplineLength())
+a = Arr2d({
+    {1, 2, 3},
+    {6, 5, 6},
+    {7, 8, 9}
+})
+
+row = a:binarySearchByCol(1,7)
+
+
+printTable(row)
+--print(a:getRow(1))
+
+
+--rr2d:set(1, 2, 42)
+
+--print("Value:", Arr2d:get(1, 2))
+--print(Arr2d:get(1, 2))
+
+--print(roadSplineLength())
 
 --function processVecs(a, b)
 --    -- Example: return dot and distance
