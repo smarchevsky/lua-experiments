@@ -1,7 +1,24 @@
 
 #include "lua_functions.h"
+#include <filesystem>
+#include <fstream>
 
 std::string filePath(PROJECT_DIR "/test.lua");
+
+static std::string textFromFile(const std::filesystem::path& path)
+{
+    std::string sourceCode;
+    std::ifstream codeStream(path, std::ios::in);
+    if (codeStream.is_open()) {
+        std::stringstream sstr;
+        sstr << codeStream.rdbuf();
+        sourceCode = sstr.str();
+        codeStream.close();
+    } else {
+        printf("Can't open file: %s\n", path.c_str());
+    }
+    return sourceCode;
+}
 
 /*int main()
 {
@@ -74,12 +91,6 @@ const char* vertexShaderSource = "#version 330 core\n"
                                  "{\n"
                                  "   gl_Position = vec4(aPos.x, aPos.y, aPos.z, 1.0);\n"
                                  "}\0";
-const char* fragmentShaderSource = "#version 330 core\n"
-                                   "out vec4 FragColor;\n"
-                                   "void main()\n"
-                                   "{\n"
-                                   "   FragColor = vec4(1.0f, 0.5f, 0.2f, 1.0f);\n"
-                                   "}\n\0";
 
 int main()
 {
@@ -124,7 +135,11 @@ int main()
     }
 
     unsigned int fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
-    glShaderSource(fragmentShader, 1, &fragmentShaderSource, NULL);
+
+    auto fragment = textFromFile(PROJECT_DIR "/shaders/shader.glsl");
+    const char* fragmentChar = fragment.c_str();
+
+    glShaderSource(fragmentShader, 1, &fragmentChar, NULL);
     glCompileShader(fragmentShader);
 
     glGetShaderiv(fragmentShader, GL_COMPILE_STATUS, &success);
