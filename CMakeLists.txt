@@ -11,7 +11,8 @@ FILE(GLOB_RECURSE ALL_CPP "src/*.c" "src/*.cpp")
 
 add_executable(${PROJECT_NAME} ${ALL_CPP} ${ALL_HEADERS}) # "main.cpp"
 
-target_link_libraries(${PROJECT_NAME} GL lua)
+find_package(glfw3 3.3 REQUIRED)
+target_link_libraries(${PROJECT_NAME} glfw GL lua)
 
 include(GNUInstallDirs)
 install(TARGETS ${PROJECT_NAME}

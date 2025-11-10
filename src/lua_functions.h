@@ -613,6 +613,7 @@ void registerMathFunctions(lua_State* L)
         luaL_newmetatable(L, "Arr2d");
 
         lua_pushcfunction(L, l_Arr2d_gc), lua_setfield(L, -2, "__gc");
+        lua_register(L, "Arr2d", l_Arr2d_new);
 
         // method table
         lua_newtable(L);
@@ -621,11 +622,7 @@ void registerMathFunctions(lua_State* L)
         lua_pushcfunction(L, l_Arr2d_getRow), lua_setfield(L, -2, "getRow");
         lua_pushcfunction(L, l_Arr2d_getBinarySearchByCol), lua_setfield(L, -2, "binarySearchByCol");
         lua_setfield(L, -2, "__index"); // metatable.__index = methods
-
         lua_pop(L, 1); // pop metatable
-
-        // Register constructor
-        lua_register(L, "Arr2d", l_Arr2d_new);
     }
 }
 } // namespace
