@@ -12,6 +12,7 @@
 
 // #define GL_SILENCE_DEPRECATION
 #include <GLFW/glfw3.h>
+#include <vector>
 
 #if defined(_MSC_VER) && (_MSC_VER >= 1900) && !defined(IMGUI_DISABLE_WIN32_FUNCTIONS)
 #pragma comment(lib, "legacy_stdio_definitions")
@@ -53,6 +54,29 @@ void main()
 }
 )";
 
+struct TextEditData {
+    // std::vector<char> text;
+    std::string text;
+};
+// The custom callback function
+// It MUST be a C-style function (static or global)
+static int InputTextCallback(ImGuiInputTextCallbackData* data)
+{
+    if (!data)
+        return 1;
+    auto& text = ((TextEditData*)data->UserData)->text;
+
+    if (data->EventFlag == ImGuiInputTextFlags_CallbackResize) {
+        if (data->BufTextLen > text.capacity()) {
+            text.resize(data->BufTextLen + 4);
+            data->Buf = text.data();
+            return 0;
+        }
+    }
+
+    return 0;
+}
+
 int main()
 {
     glfwInit();
@@ -65,6 +89,7 @@ int main()
 
     if (window == nullptr)
         return 1;
+
     glfwMakeContextCurrent(window);
     glfwSwapInterval(1);
     glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
@@ -85,6 +110,7 @@ int main()
         ImGui::StyleColorsDark();
 
         ImGuiStyle& style = ImGui::GetStyle();
+        main_scale = 2;
         style.ScaleAllSizes(main_scale);
         style.FontScaleDpi = main_scale;
 
@@ -157,6 +183,7 @@ int main()
         glBindVertexArray(0);
     }
 
+    bool first_time = true;
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();
         processInput(window);
@@ -169,35 +196,64 @@ int main()
         glBindVertexArray(VAO);
         glDrawArrays(GL_TRIANGLES, 0, 6);
         /////////////////////////////////////////////////////////////////////////////////////////
-        ImGui_ImplOpenGL3_NewFrame();
-        ImGui_ImplGlfw_NewFrame();
-        ImGui::NewFrame();
 
         {
+            ImGui_ImplOpenGL3_NewFrame();
+            ImGui_ImplGlfw_NewFrame();
+            ImGui::NewFrame();
+
             static float f = 0.0f;
             static int counter = 0;
             ImGui::Begin("Hello, world!");
+
+            ImDrawList* draw_list = ImGui::GetWindowDrawList();
+
+            int start = draw_list->VtxBuffer.Size;
+            int end = draw_list->VtxBuffer.Size;
+
             ImGui::Text("This is some useful text.");
-            ImGui::SliderFloat("float", &f, 0.0f, 1.0f);
-            ImGui::ColorEdit3("clear color", (float*)&clear_color);
-            if (ImGui::Button("Button"))
-                counter++;
-            ImGui::SameLine();
-            ImGui::Text("counter = %d", counter);
+            ImGuiInputTextFlags flags = 0
+                | ImGuiInputTextFlags_WordWrap
+                | ImGuiInputTextFlags_CallbackResize
+                | ImGuiInputTextFlags_NoHorizontalScroll
+                | ImGuiInputTextFlags_AllowTabInput
+                | ImGuiInputTextFlags_CallbackCharFilter;
+
+            if (first_time) {
+                // 1. Set the flag to true for the next item
+                ImGui::SetKeyboardFocusHere();
+                first_time = false;
+            }
+
+            static TextEditData editor_state = { "Initial text..." };
+            ImGui::InputTextMultiline("###TextEditWindow", (char*)editor_state.text.data(),
+                editor_state.text.size() + 1, ImVec2(-1, -1), flags, InputTextCallback, (void*)&editor_state);
+
+            for (int i = start; i < end; ++i) {
+                //    if (i < start + 8)
+                //        draw_list->VtxBuffer[i].col = ImColor(255, 0, 0, 255);
+            }
+
+            // printf("%d %d\n", start, end);
+
+            // ImGui::SliderFloat("float", &f, 0.0f, 1.0f);
+            // ImGui::ColorEdit3("clear color", (float*)&clear_color);
+            // if (ImGui::Button("Button"))
+            //     counter++;
+            // ImGui::SameLine();
+            // ImGui::Text("counter = %d", counter);
             // ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
             ImGui::End();
-        }
 
-        ImGui::Render();
-        int display_w, display_h;
-        glfwGetFramebufferSize(window, &display_w, &display_h);
-        // glViewport(0, 0, display_w, display_h);
-        // glClearColor(clear_color.x * clear_color.w, clear_color.y * clear_color.w, clear_color.z * clear_color.w, clear_color.w);
-        // glClear(GL_COLOR_BUFFER_BIT);
-        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+            ImGui::Render();
+            int display_w, display_h;
+            glfwGetFramebufferSize(window, &display_w, &display_h);
+            ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+        }
 
         /////////////////////////////////////////////////////////////////////////////////////////
         glfwSwapBuffers(window);
+        fflush(stdout);
     }
 
     glDeleteVertexArrays(1, &VAO);
