@@ -35,9 +35,6 @@ static std::string textFromFile(const std::filesystem::path& path)
     return sourceCode;
 }
 
-void framebuffer_size_callback(GLFWwindow* window, int width, int height);
-void processInput(GLFWwindow* window);
-
 // settings
 const unsigned int SCR_WIDTH = 800;
 const unsigned int SCR_HEIGHT = 600;
@@ -54,17 +51,158 @@ void main()
 }
 )";
 
-struct TextEditData {
-    // std::vector<char> text;
-    std::string text;
+#include <iostream>
+#include <unordered_map>
+
+#define ARR_SIZE(x) sizeof(x) / sizeof(x[0])
+const char* colors[] = { "\033[0m", "\033[31m", "\033[32m", "\033[33m", "\033[34m", "\033[35m", "\033[36m", "\033[37m" };
+
+struct TrieNode {
+    bool isWord = false;
+    uint8_t colorIndex = 0;
+    std::unordered_map<char, TrieNode*> children;
 };
-// The custom callback function
-// It MUST be a C-style function (static or global)
+
+class Trie {
+    TrieNode root;
+    void clear(TrieNode& n)
+    {
+        for (auto& c : n.children) {
+            clear(*c.second);
+            delete c.second;
+        }
+    }
+
+public:
+    Trie() { insert("int"), insert("hello"), insert("float"); };
+    ~Trie() { clear(root); };
+
+    void insert(const std::string& word)
+    {
+        TrieNode* node = &root;
+        for (auto c : word)
+            node = node->children[c] ? node->children[c] : (node->children[c] = new TrieNode());
+        // node->colorIndex = index;
+        node->isWord = true;
+    }
+
+    int match(const std::string text, int pos, int& colorIndex) const
+    {
+        const TrieNode* node = &root;
+        int len = 0;
+
+        for (int i = pos; i < text.size(); ++i) {
+            auto it = node->children.find(text[i]);
+            if (it == node->children.end())
+                break;
+
+            node = it->second;
+            ++len;
+
+            if (node->isWord) {
+                colorIndex = node->colorIndex;
+                return len;
+            }
+        }
+
+        return 0;
+    }
+};
+
+struct ColorMark {
+    int pos;
+    int colorIndex;
+};
+
+bool isIdent(char c) { return isalnum(c) || c == '_'; }
+
+std::vector<ColorMark> highlight(const char* str, int strLen, const Trie& trie)
+{
+    // std::string output;
+    std::vector<ColorMark> colorMarks;
+
+    for (int i = 0; i < strLen;) {
+        int colorIndex = 0;
+        int len = trie.match(str, i, colorIndex);
+
+        if (len > 0) {
+            int end = i + len;
+            char before = (i > 0) ? str[i - 1] : '\0';
+            char after = (end < strLen) ? str[end] : '\0';
+
+            if (!isIdent(before) && !isIdent(after)) {
+                // output += colors[colorIndex] + line.substr(i, len) + "\033[0m";
+                colorMarks.push_back({ i, 1 });
+                colorMarks.push_back({ i + len, 0 });
+                i += len;
+                continue;
+            }
+        }
+
+        // output += line[i];
+        i++;
+    }
+    return colorMarks;
+}
+
+bool windowOpen = true;
+void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
+{
+    if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
+        glfwSetWindowShouldClose(window, GLFW_TRUE);
+    else if (key == GLFW_KEY_GRAVE_ACCENT && action == GLFW_PRESS) {
+        windowOpen = !windowOpen;
+    }
+}
+
+void framebuffer_size_callback(GLFWwindow* window, int width, int height) { glViewport(0, 0, width, height); }
+
+struct TextEditData {
+    std::string text;
+    std::vector<ColorMark> colorMark;
+    int prevSize = 0;
+};
+
+static const Trie trie;
+
 static int InputTextCallback(ImGuiInputTextCallbackData* data)
 {
     if (!data)
         return 1;
-    auto& text = ((TextEditData*)data->UserData)->text;
+
+    auto textEditData = (TextEditData*)data->UserData;
+    std::string& text = textEditData->text;
+    int& prevSize = textEditData->prevSize;
+
+    if (data->EventFlag == ImGuiInputTextFlags_CallbackEdit) {
+        int start = data->CursorPos - 1;
+        auto& buf = data->Buf;
+
+        while (start >= 0) {
+            if (!isIdent(buf[start]))
+                break;
+            start--;
+        }
+
+        std::vector<ColorMark> marks = highlight(data->Buf, data->BufTextLen, trie);
+        for (auto& m : marks) {
+            if (m.colorIndex) {
+                printf("start: %d, ", m.pos);
+            } else
+                printf("end: %d, ", m.pos);
+        }
+        if (marks.size())
+            printf("\n");
+
+        return 0;
+    }
+
+    if (data->EventFlag == ImGuiInputTextFlags_CallbackCharFilter) {
+        if (data->EventChar == '`') {
+            windowOpen = !windowOpen;
+            return 1;
+        }
+    }
 
     if (data->EventFlag == ImGuiInputTextFlags_CallbackResize) {
         if (data->BufTextLen > text.capacity()) {
@@ -98,6 +236,7 @@ int main()
         return -1;
     }
 
+    glfwSetKeyCallback(window, key_callback);
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
     {
         IMGUI_CHECKVERSION();
@@ -184,9 +323,11 @@ int main()
     }
 
     bool first_time = true;
+
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();
-        processInput(window);
+        int display_w, display_h;
+        glfwGetFramebufferSize(window, &display_w, &display_h);
 
         glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
@@ -197,6 +338,7 @@ int main()
         glDrawArrays(GL_TRIANGLES, 0, 6);
         /////////////////////////////////////////////////////////////////////////////////////////
 
+        // static bool wind
         {
             ImGui_ImplOpenGL3_NewFrame();
             ImGui_ImplGlfw_NewFrame();
@@ -204,17 +346,25 @@ int main()
 
             static float f = 0.0f;
             static int counter = 0;
-            ImGui::Begin("Hello, world!");
+
+            ImGuiInputTextFlags flags = 0
+                | ImGuiWindowFlags_NoMove
+                | ImGuiWindowFlags_NoResize
+                // | ImGuiWindowFlags_NoCollapse
+                // | ImGuiWindowFlags_NoSavedSettings
+                ;
+
+            ImGui::SetNextWindowPos(ImVec2(40, 40));
+            ImGui::SetNextWindowSize(ImVec2(display_w - 80, display_h - 80));
+            ImGui::Begin("Lua editor, press ` to toggle window", &windowOpen, flags);
 
             ImDrawList* draw_list = ImGui::GetWindowDrawList();
 
-            int start = draw_list->VtxBuffer.Size;
-            int end = draw_list->VtxBuffer.Size;
-
             ImGui::Text("This is some useful text.");
-            ImGuiInputTextFlags flags = 0
+            flags = 0
                 | ImGuiInputTextFlags_WordWrap
                 | ImGuiInputTextFlags_CallbackResize
+                | ImGuiInputTextFlags_CallbackEdit
                 | ImGuiInputTextFlags_NoHorizontalScroll
                 | ImGuiInputTextFlags_AllowTabInput
                 | ImGuiInputTextFlags_CallbackCharFilter;
@@ -226,8 +376,11 @@ int main()
             }
 
             static TextEditData editor_state = { "Initial text..." };
+
+            int start = draw_list->VtxBuffer.Size;
             ImGui::InputTextMultiline("###TextEditWindow", (char*)editor_state.text.data(),
                 editor_state.text.size() + 1, ImVec2(-1, -1), flags, InputTextCallback, (void*)&editor_state);
+            int end = draw_list->VtxBuffer.Size;
 
             for (int i = start; i < end; ++i) {
                 //    if (i < start + 8)
@@ -246,8 +399,7 @@ int main()
             ImGui::End();
 
             ImGui::Render();
-            int display_w, display_h;
-            glfwGetFramebufferSize(window, &display_w, &display_h);
+
             ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
         }
 
@@ -267,17 +419,6 @@ int main()
     glfwDestroyWindow(window);
     glfwTerminate();
     return 0;
-}
-
-void processInput(GLFWwindow* window)
-{
-    if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
-        glfwSetWindowShouldClose(window, true);
-}
-
-void framebuffer_size_callback(GLFWwindow* window, int width, int height)
-{
-    glViewport(0, 0, width, height);
 }
 
 /*int main()
