@@ -3,6 +3,7 @@
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
+#include "imgui_internal.h"
 
 #include <filesystem>
 #include <fstream>
@@ -86,12 +87,12 @@ public:
         node->isWord = true;
     }
 
-    int match(const std::string text, int pos, int& colorIndex) const
+    int match(const char* text, int start, int& colorIndex) const
     {
         const TrieNode* node = &root;
         int len = 0;
 
-        for (int i = pos; i < text.size(); ++i) {
+        for (int i = start; text[i]; ++i) {
             auto it = node->children.find(text[i]);
             if (it == node->children.end())
                 break;
@@ -116,11 +117,11 @@ struct ColorMark {
 
 bool isIdent(char c) { return isalnum(c) || c == '_'; }
 
-std::vector<ColorMark> highlight(const char* str, int strLen, const Trie& trie)
+void highlight(ImFontBaked* font, const char* str, int strLen,
+    const Trie& trie, std::vector<ColorMark>& marks)
 {
-    // std::string output;
-    std::vector<ColorMark> colorMarks;
-
+    marks.clear();
+    int numInvisible = 0;
     for (int i = 0; i < strLen;) {
         int colorIndex = 0;
         int len = trie.match(str, i, colorIndex);
@@ -132,17 +133,37 @@ std::vector<ColorMark> highlight(const char* str, int strLen, const Trie& trie)
 
             if (!isIdent(before) && !isIdent(after)) {
                 // output += colors[colorIndex] + line.substr(i, len) + "\033[0m";
-                colorMarks.push_back({ i, 1 });
-                colorMarks.push_back({ i + len, 0 });
+                marks.push_back({ i - numInvisible, 1 });
+                marks.push_back({ i + len - numInvisible, 0 });
                 i += len;
                 continue;
             }
         }
-
-        // output += line[i];
+        //  output += line[i];
+        if (!font->FindGlyph(str[i])->Visible) {
+            numInvisible++;
+        }
         i++;
     }
-    return colorMarks;
+
+    std::vector<ColorMark> compacted;
+    for (int i = 0; i < strLen; ++i) {
+        if (!font->FindGlyph(str[i])->Visible) {
+            numInvisible++;
+        }
+    }
+
+    // for (auto& m : marks) {
+    //     if (m.colorIndex) {
+    //         printf("start: %d, ", m.pos);
+    //     } else {
+    //         printf("end: %d, ", m.pos);
+    //     }
+    // }
+
+    // if (marks.size())
+    //     printf("\n");
+    // printf("numInvisible %d  ", numInvisible);
 }
 
 bool windowOpen = true;
@@ -159,7 +180,7 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height) { glVi
 
 struct TextEditData {
     std::string text;
-    std::vector<ColorMark> colorMark;
+    std::vector<ColorMark> colorMarks;
     int prevSize = 0;
 };
 
@@ -173,6 +194,7 @@ static int InputTextCallback(ImGuiInputTextCallbackData* data)
     auto textEditData = (TextEditData*)data->UserData;
     std::string& text = textEditData->text;
     int& prevSize = textEditData->prevSize;
+    auto& marks = textEditData->colorMarks;
 
     if (data->EventFlag == ImGuiInputTextFlags_CallbackEdit) {
         int start = data->CursorPos - 1;
@@ -184,15 +206,7 @@ static int InputTextCallback(ImGuiInputTextCallbackData* data)
             start--;
         }
 
-        std::vector<ColorMark> marks = highlight(data->Buf, data->BufTextLen, trie);
-        for (auto& m : marks) {
-            if (m.colorIndex) {
-                printf("start: %d, ", m.pos);
-            } else
-                printf("end: %d, ", m.pos);
-        }
-        if (marks.size())
-            printf("\n");
+        highlight(data->Ctx->Font->LastBaked, data->Buf, data->BufTextLen, trie, marks);
 
         return 0;
     }
@@ -358,8 +372,6 @@ int main()
             ImGui::SetNextWindowSize(ImVec2(display_w - 80, display_h - 80));
             ImGui::Begin("Lua editor, press ` to toggle window", &windowOpen, flags);
 
-            ImDrawList* draw_list = ImGui::GetWindowDrawList();
-
             ImGui::Text("This is some useful text.");
             flags = 0
                 | ImGuiInputTextFlags_WordWrap
@@ -375,17 +387,72 @@ int main()
                 first_time = false;
             }
 
-            static TextEditData editor_state = { "Initial text..." };
+            static TextEditData editData = { "Initial text..." };
 
-            int start = draw_list->VtxBuffer.Size;
-            ImGui::InputTextMultiline("###TextEditWindow", (char*)editor_state.text.data(),
-                editor_state.text.size() + 1, ImVec2(-1, -1), flags, InputTextCallback, (void*)&editor_state);
-            int end = draw_list->VtxBuffer.Size;
+            ImGui::InputTextMultiline("##editor",
+                (char*)editData.text.data(), editData.text.size() + 1,
+                ImVec2(-1, -1), flags, InputTextCallback, (void*)&editData);
 
-            for (int i = start; i < end; ++i) {
-                //    if (i < start + 8)
-                //        draw_list->VtxBuffer[i].col = ImColor(255, 0, 0, 255);
+            //            ImGuiID id = ImGui::GetID("##editor");
+
+            // for (int cmd_i = 0; cmd_i < dl->CmdBuffer.Size; cmd_i++) {
+            //     const ImDrawCmd& cmd = dl->CmdBuffer[cmd_i];
+            //     int vtxCount = cmd.ElemCount; // index count, not vertex count
+            //      if (cmd.TexRef == font->OwnerAtlas->TexID) {
+            //          printf("offset: %d ", cmd.VtxOffset);
+            //          printf("count: %d", cmd.ElemCount);
+            //          printf("\n");
+            //          // vtxOffset = cmd.VtxOffset;
+            //      }
+            // }
+
+            if (auto font = ImGui::GetFont()) {
+                if (auto fb = font->LastBaked) {
+                    // printf("%d\n", fb->FindGlyph('c')->Visible);
+                }
             }
+
+            ImGuiWindow* child = ImGui::GetCurrentWindow()->DC.ChildWindows.back();
+
+            auto& vb = child->DrawList->VtxBuffer;
+
+            int numItems = editData.colorMarks.size();
+            for (int colorMarkIndex = 0; colorMarkIndex < numItems - 1; ++colorMarkIndex) {
+                auto& curr = editData.colorMarks[colorMarkIndex];
+                auto& next = editData.colorMarks[colorMarkIndex + 1];
+                if (curr.colorIndex == 0)
+                    continue;
+
+                auto vertexBufSizeAsChar = vb.Size / 4;
+                if (curr.pos >= vertexBufSizeAsChar)
+                    break;
+                if (next.pos >= vertexBufSizeAsChar)
+                    break;
+                // assert(curr.pos < editData.text.size() && "curr pos out of range");
+                // assert(next.pos < editData.text.size() && "next pos out of range");
+
+                for (int ci = curr.pos; ci < next.pos; ++ci) {
+                    for (int vertIndex = 0; vertIndex < 4; ++vertIndex) {
+                        vb[ci * 4 + vertIndex].col = ImColor(255, 0, 0, 255);
+                    }
+                }
+            }
+
+            // printf("%d", window->IDStack.size());
+
+            // IDStack
+
+            // printf("%p ", child);
+            //  ImDrawList* dl = child->DrawList;
+
+            // for (int i = start; i < end; ++i) {
+            //     if (i >= 0 && i < draw_list->VtxBuffer.size())
+            //         draw_list->VtxBuffer[i].col = ImColor(255, 0, 0, 255);
+            // }
+
+            // for (int i = 0; i < draw_list->VtxBuffer.size(); ++i) {
+            //     draw_list->VtxBuffer[i].col = ImColor(255, 0, 0, 255);
+            // }
 
             // printf("%d %d\n", start, end);
 
