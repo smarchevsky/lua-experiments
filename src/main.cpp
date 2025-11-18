@@ -60,8 +60,8 @@ void main()
 const char* colors[] = { "\033[0m", "\033[31m", "\033[32m", "\033[33m", "\033[34m", "\033[35m", "\033[36m", "\033[37m" };
 
 struct TrieNode {
-    bool isWord = false;
-    uint8_t colorIndex = 0;
+    ImU32 color = 0xFFFFFFFF;
+    bool isEnd = false;
     std::unordered_map<char, TrieNode*> children;
 };
 
@@ -76,19 +76,25 @@ class Trie {
     }
 
 public:
-    Trie() { insert("int"), insert("hello"), insert("float"); };
+    Trie()
+    {
+        insert("int", 0xFF6600FF);
+        insert("hello", 0xFF77BB00);
+        insert("float", 0xFF4455FF);
+        insert("print", 0xFFFF4455);
+    };
     ~Trie() { clear(root); };
 
-    void insert(const std::string& word)
+    void insert(const std::string& word, ImU32 color = 0xFFFFFFFF)
     {
         TrieNode* node = &root;
         for (auto c : word)
             node = node->children[c] ? node->children[c] : (node->children[c] = new TrieNode());
-        // node->colorIndex = index;
-        node->isWord = true;
+        node->color = color;
+        node->isEnd = true;
     }
 
-    int match(const char* text, int start, int& colorIndex) const
+    int match(const char* text, int start, ImU32& color) const
     {
         const TrieNode* node = &root;
         int len = 0;
@@ -101,8 +107,8 @@ public:
             node = it->second;
             ++len;
 
-            if (node->isWord) {
-                colorIndex = node->colorIndex;
+            if (node->isEnd) {
+                color = node->color;
                 return len;
             }
         }
@@ -111,21 +117,17 @@ public:
     }
 };
 
-struct ColorMark {
-    int pos;
-    int colorIndex;
-};
-
 bool isIdent(char c) { return isalnum(c) || c == '_'; }
 
 void highlight(ImFontBaked* font, const char* str, int strLen,
-    const Trie& trie, std::vector<ColorMark>& marks)
+    const Trie& trie, std::vector<ImTextColorData>& marks)
 {
+    ImU32 color = 0xFFFFFFFF;
     marks.clear();
-    int numInvisible = 0;
+    marks.push_back(ImTextColorData { 0, 0xFFFFFFFF });
     for (int i = 0; i < strLen;) {
         int colorIndex = 0;
-        int len = trie.match(str, i, colorIndex);
+        int len = trie.match(str, i, color);
 
         if (len > 0) {
             int end = i + len;
@@ -134,24 +136,14 @@ void highlight(ImFontBaked* font, const char* str, int strLen,
 
             if (!isIdent(before) && !isIdent(after)) {
                 // output += colors[colorIndex] + line.substr(i, len) + "\033[0m";
-                marks.push_back({ i - numInvisible, 1 });
-                marks.push_back({ i + len - numInvisible, 0 });
+                marks.push_back(ImTextColorData { i, color });
+                marks.push_back(ImTextColorData { i + len, 0xFFFFFFFF });
                 i += len;
                 continue;
             }
         }
         //  output += line[i];
-        if (!font->FindGlyph(str[i])->Visible) {
-            numInvisible++;
-        }
         i++;
-    }
-
-    std::vector<ColorMark> compacted;
-    for (int i = 0; i < strLen; ++i) {
-        if (!font->FindGlyph(str[i])->Visible) {
-            numInvisible++;
-        }
     }
 
     // for (auto& m : marks) {
@@ -181,7 +173,7 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height) { glVi
 
 struct TextEditData {
     std::string text;
-    std::vector<ColorMark> colorMarks;
+    std::vector<ImTextColorData> colorMarks;
     int prevSize = 0;
 };
 
@@ -238,7 +230,7 @@ int main()
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
     float main_scale = ImGui_ImplGlfw_GetContentScaleForMonitor(glfwGetPrimaryMonitor()); // Valid on GLFW 3.3+ only
-    GLFWwindow* window = glfwCreateWindow((int)(1280 * main_scale), (int)(800 * main_scale), "Dear ImGui GLFW+OpenGL3 example", nullptr, nullptr);
+    GLFWwindow* window = glfwCreateWindow((int)(800 * main_scale), (int)(600 * main_scale), "Dear ImGui GLFW+OpenGL3 example", nullptr, nullptr);
 
     if (window == nullptr)
         return 1;
@@ -350,7 +342,7 @@ int main()
         // draw our first triangle
         glUseProgram(shaderProgram);
         glBindVertexArray(VAO);
-        glDrawArrays(GL_TRIANGLES, 0, 6);
+        // glDrawArrays(GL_TRIANGLES, 0, 6);
         /////////////////////////////////////////////////////////////////////////////////////////
 
         // static bool wind
@@ -371,9 +363,9 @@ int main()
 
             ImGui::SetNextWindowPos(ImVec2(40, 40));
             ImGui::SetNextWindowSize(ImVec2(display_w - 80, display_h - 80));
-            ImGui::Begin("Lua editor, press ` to toggle window", &windowOpen, flags);
+            ImGui::Begin("Multicolor text editor", &windowOpen, flags);
 
-            ImGui::Text("This is some useful text.");
+            //ImGui::Text("This is some useful text.");
             flags = 0
                 | ImGuiInputTextFlags_WordWrap
                 | ImGuiInputTextFlags_CallbackResize
@@ -388,11 +380,12 @@ int main()
                 first_time = false;
             }
 
-            static TextEditData editData = { "Initial text..." };
+            static TextEditData editData = { "uu int aa float" };
 
             ImGui::InputTextMultiline("##editor",
                 (char*)editData.text.data(), editData.text.size() + 1,
-                ImVec2(-1, -1), flags, InputTextCallback, (void*)&editData);
+                ImVec2(-1, -1), flags, InputTextCallback, (void*)&editData,
+                editData.colorMarks.data(), editData.colorMarks.size());
 
             //            ImGuiID id = ImGui::GetID("##editor");
 
@@ -413,31 +406,31 @@ int main()
                 }
             }
 
-            ImGuiWindow* child = ImGui::GetCurrentWindow()->DC.ChildWindows.back();
-
-            auto& vb = child->DrawList->VtxBuffer;
-
-            int numItems = editData.colorMarks.size();
-            for (int colorMarkIndex = 0; colorMarkIndex < numItems - 1; ++colorMarkIndex) {
-                auto& curr = editData.colorMarks[colorMarkIndex];
-                auto& next = editData.colorMarks[colorMarkIndex + 1];
-                if (curr.colorIndex == 0)
-                    continue;
-
-                auto vertexBufSizeAsChar = vb.Size / 4;
-                if (curr.pos >= vertexBufSizeAsChar)
-                    break;
-                if (next.pos >= vertexBufSizeAsChar)
-                    break;
-                // assert(curr.pos < editData.text.size() && "curr pos out of range");
-                // assert(next.pos < editData.text.size() && "next pos out of range");
-
-                for (int ci = curr.pos; ci < next.pos; ++ci) {
-                    for (int vertIndex = 0; vertIndex < 4; ++vertIndex) {
-                        vb[ci * 4 + vertIndex].col = ImColor(255, 0, 0, 255);
-                    }
-                }
-            }
+            // ImGuiWindow* child = ImGui::GetCurrentWindow()->DC.ChildWindows.back();
+            //
+            // auto& vb = child->DrawList->VtxBuffer;
+            //
+            // int numItems = editData.colorMarks.size();
+            // for (int colorMarkIndex = 0; colorMarkIndex < numItems - 1; ++colorMarkIndex) {
+            //     auto& curr = editData.colorMarks[colorMarkIndex];
+            //     auto& next = editData.colorMarks[colorMarkIndex + 1];
+            //     if (curr.colorIndex == 0)
+            //         continue;
+            //
+            //     auto vertexBufSizeAsChar = vb.Size / 4;
+            //     if (curr.pos >= vertexBufSizeAsChar)
+            //         break;
+            //     if (next.pos >= vertexBufSizeAsChar)
+            //         break;
+            //     // assert(curr.pos < editData.text.size() && "curr pos out of range");
+            //     // assert(next.pos < editData.text.size() && "next pos out of range");
+            //
+            //     for (int ci = curr.pos; ci < next.pos; ++ci) {
+            //         for (int vertIndex = 0; vertIndex < 4; ++vertIndex) {
+            //             vb[ci * 4 + vertIndex].col = ImColor(255, 0, 0, 255);
+            //         }
+            //     }
+            // }
 
             // printf("%d", window->IDStack.size());
 

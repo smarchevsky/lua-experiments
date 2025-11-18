@@ -3934,9 +3934,9 @@ bool ImGui::InputText(const char* label, char* buf, size_t buf_size, ImGuiInputT
     return InputTextEx(label, NULL, buf, (int)buf_size, ImVec2(0, 0), flags, callback, user_data);
 }
 
-bool ImGui::InputTextMultiline(const char* label, char* buf, size_t buf_size, const ImVec2& size, ImGuiInputTextFlags flags, ImGuiInputTextCallback callback, void* user_data)
+bool ImGui::InputTextMultiline(const char* label, char* buf, size_t buf_size, const ImVec2& size, ImGuiInputTextFlags flags, ImGuiInputTextCallback callback, void* user_data, ImTextColorData* color_data, int color_data_num)
 {
-    return InputTextEx(label, NULL, buf, (int)buf_size, size, flags | ImGuiInputTextFlags_Multiline, callback, user_data);
+    return InputTextEx(label, NULL, buf, (int)buf_size, size, flags | ImGuiInputTextFlags_Multiline, callback, user_data, color_data, color_data_num);
 }
 
 bool ImGui::InputTextWithHint(const char* label, const char* hint, char* buf, size_t buf_size, ImGuiInputTextFlags flags, ImGuiInputTextCallback callback, void* user_data)
@@ -4629,7 +4629,10 @@ static ImVec2 InputTextLineIndexGetPosOffset(ImGuiContext& g, ImGuiInputTextStat
 //   Note that in std::string world, capacity() would omit 1 byte used by the zero-terminator.
 // - When active, hold on a privately held copy of the text (and apply back to 'buf'). So changing 'buf' while the InputText is active has no effect.
 // - If you want to use InputText() with std::string or any custom dynamic string type, use the wrapper in misc/cpp/imgui_stdlib.h/.cpp!
-bool ImGui::InputTextEx(const char* label, const char* hint, char* buf, int buf_size, const ImVec2& size_arg, ImGuiInputTextFlags flags, ImGuiInputTextCallback callback, void* callback_user_data)
+bool ImGui::InputTextEx(const char* label, const char* hint, char* buf, int buf_size, 
+    const ImVec2& size_arg, ImGuiInputTextFlags flags, 
+    ImGuiInputTextCallback callback, void* callback_user_data, 
+    ImTextColorData* color_data, int color_data_num)
 {
     ImGuiWindow* window = GetCurrentWindow();
     if (window->SkipItems)
@@ -5543,13 +5546,15 @@ bool ImGui::InputTextEx(const char* label, const char* hint, char* buf, int buf_
     //draw_scroll.x = state->Scroll.x; // Preserve scroll when inactive?
 
     // Render text
-    if ((is_multiline || (buf_display_end - buf_display) < buf_display_max_length) && (text_col & IM_COL32_A_MASK) && (line_visible_n0 < line_visible_n1))
+    if ((is_multiline || (buf_display_end - buf_display) < buf_display_max_length) && (text_col & IM_COL32_A_MASK) && (line_visible_n0 < line_visible_n1)) {
         g.Font->RenderText(draw_window->DrawList, g.FontSize,
             draw_pos - draw_scroll + ImVec2(0.0f, line_visible_n0 * g.FontSize),
             text_col, clip_rect.AsVec4(),
             line_index->get_line_begin(buf_display, line_visible_n0),
             line_index->get_line_end(buf_display, line_visible_n1 - 1),
-            wrap_width, ImDrawTextFlags_WrapKeepBlanks | ImDrawTextFlags_CpuFineClip);
+            wrap_width, ImDrawTextFlags_WrapKeepBlanks | ImDrawTextFlags_CpuFineClip,
+            color_data, color_data_num, buf_display);
+    }
 
     // Render blinking cursor
     if (render_cursor)
