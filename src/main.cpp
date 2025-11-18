@@ -59,9 +59,15 @@ void main()
 #define ARR_SIZE(x) sizeof(x) / sizeof(x[0])
 const char* colors[] = { "\033[0m", "\033[31m", "\033[32m", "\033[33m", "\033[34m", "\033[35m", "\033[36m", "\033[37m" };
 
+enum class CommentType : uint8_t { None,
+    Line,
+    BlockStart,
+    BlockEnd };
+
 struct TrieNode {
     ImU32 color = 0xFFFFFFFF;
     bool isEnd = false;
+    CommentType commentType = CommentType::None;
     std::unordered_map<char, TrieNode*> children;
 };
 
@@ -81,20 +87,25 @@ public:
         insert("int", 0xFF6600FF);
         insert("hello", 0xFF77BB00);
         insert("float", 0xFF4455FF);
+        insert("char", 0xFF00AAFF);
         insert("print", 0xFFFF4455);
+        insert("//", 0xFF666666, CommentType::Line);
+        insert("/*", 0xFF666666, CommentType::BlockStart);
+        insert("*/", 0xFF666666, CommentType::BlockEnd);
     };
     ~Trie() { clear(root); };
 
-    void insert(const std::string& word, ImU32 color = 0xFFFFFFFF)
+    void insert(const std::string& word, ImU32 color = 0xFFFFFFFF, CommentType commentType = CommentType::None)
     {
         TrieNode* node = &root;
         for (auto c : word)
             node = node->children[c] ? node->children[c] : (node->children[c] = new TrieNode());
         node->color = color;
+        node->commentType = commentType;
         node->isEnd = true;
     }
 
-    int match(const char* text, int start, ImU32& color) const
+    int match(const char* text, int start, ImU32& color, CommentType& commentType) const
     {
         const TrieNode* node = &root;
         int len = 0;
@@ -109,6 +120,7 @@ public:
 
             if (node->isEnd) {
                 color = node->color;
+                commentType = node->commentType;
                 return len;
             }
         }
@@ -125,11 +137,42 @@ void highlight(ImFontBaked* font, const char* str, int strLen,
     ImU32 color = 0xFFFFFFFF;
     marks.clear();
     marks.push_back(ImTextColorData { 0, 0xFFFFFFFF });
+    CommentType commentType = CommentType::None;
+    bool isBlockComment = false;
+
     for (int i = 0; i < strLen;) {
-        int colorIndex = 0;
-        int len = trie.match(str, i, color);
+        if (commentType == CommentType::Line) {
+            if (str[i] == '\n') {
+                marks.push_back(ImTextColorData { i, 0xFFFFFFFF });
+                commentType = CommentType::None;
+            }
+            i++;
+            continue;
+        }
+
+        int len = trie.match(str, i, color, commentType);
 
         if (len > 0) {
+            if (commentType == CommentType::Line || commentType == CommentType::BlockStart) {
+                isBlockComment = commentType == CommentType::BlockStart;
+                marks.push_back(ImTextColorData { i, color });
+                i += len;
+                continue;
+
+            }
+            
+            if (commentType == CommentType::BlockEnd) {
+                i += len;
+                marks.push_back(ImTextColorData { i, 0xFFFFFFFF });
+                isBlockComment = false;
+                continue;
+            }
+
+            if (isBlockComment) {
+                i++;
+                continue;
+            }
+
             int end = i + len;
             char before = (i > 0) ? str[i - 1] : '\0';
             char after = (end < strLen) ? str[end] : '\0';
@@ -143,6 +186,7 @@ void highlight(ImFontBaked* font, const char* str, int strLen,
             }
         }
         //  output += line[i];
+
         i++;
     }
 
@@ -365,7 +409,7 @@ int main()
             ImGui::SetNextWindowSize(ImVec2(display_w - 80, display_h - 80));
             ImGui::Begin("Multicolor text editor", &windowOpen, flags);
 
-            //ImGui::Text("This is some useful text.");
+            // ImGui::Text("This is some useful text.");
             flags = 0
                 | ImGuiInputTextFlags_WordWrap
                 | ImGuiInputTextFlags_CallbackResize
