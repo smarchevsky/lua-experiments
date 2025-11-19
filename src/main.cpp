@@ -116,14 +116,15 @@ class Trie {
 public:
     Trie()
     {
+        // testing different word endings
         insert("one", 0xFF6600FF);
-        insert("three", 0xFF00AAFF);
-        insert("two", 0xFF4455FF);
-        insert("four", 0xFF77BB00);
-        insert("five", 0xFFFF4455);
-        insert("//", 0xFF666666, CommentType::Line);
-        insert("/*", 0xFF666666, CommentType::BlockStart);
-        insert("*/", 0xFF666666, CommentType::BlockEnd);
+        insert("onee", 0xFF4455FF);
+        insert("oneee", 0xFF00AAFF);
+        insert("oneeee", 0xFF77BB00);
+        insert("oneeeee", 0xFFFF4455);
+        insert("--", 0xFF666666, CommentType::Line);
+        insert("--[[", 0xFF666666, CommentType::BlockStart);
+        insert("]]", 0xFF666666, CommentType::BlockEnd);
     };
     ~Trie() { clear(root); };
 
@@ -137,27 +138,34 @@ public:
         node->isEnd = true;
     }
 
-    int match(const char* text, int start, ImU32& color, CommentType& commentType) const
+    int match(const char* text, ImU32& color, CommentType& commentType) const
     {
-        const TrieNode* node = &root;
         int len = 0;
+        matchInternal(&root, text, color, commentType, len);
+        return len;
+    }
 
-        for (int i = start; text[i]; ++i) {
-            auto it = node->children.find(text[i]);
+private:
+    const TrieNode* matchInternal(const TrieNode* node, const char* text,
+        ImU32& color, CommentType& commentType, int& len) const
+    {
+        while (*text) {
+            auto it = node->children.find(*text);
             if (it == node->children.end())
                 break;
 
             node = it->second;
             ++len;
 
-            if (node->isEnd) {
-                color = node->color;
-                commentType = node->commentType;
-                return len;
-            }
+            if (node->isEnd && node->children.empty())
+                break;
+
+            text++;
         }
 
-        return 0;
+        color = node->color;
+        commentType = node->commentType;
+        return node;
     }
 };
 
@@ -182,7 +190,7 @@ void highlight(const char* str, int strLen,
             continue;
         }
 
-        int len = trie.match(str, i, color, commentType);
+        int len = trie.match(str + i, color, commentType);
 
         if (len > 0) {
             if (commentType == CommentType::Line || commentType == CommentType::BlockStart) {
@@ -459,7 +467,7 @@ int main()
                 first_time = false;
             }
 
-            static TextEditData editData("one, two, three, four, five");
+            static TextEditData editData("one, onee, oneee, oneeee, oneeeee");
 
             ImGui::InputTextMultiline("##editor",
                 (char*)editData.text.data(), editData.text.size() + 1,
@@ -471,8 +479,6 @@ int main()
                     // printf("%d\n", fb->FindGlyph('c')->Visible);
                 }
             }
-
-
 
             // printf("%d", window->IDStack.size());
 
