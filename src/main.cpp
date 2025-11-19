@@ -96,8 +96,9 @@ enum class CommentType : uint8_t { None,
     BlockStart,
     BlockEnd };
 
+#define DEFAULT_COLOR 0xFFFFFFFF
 struct TrieNode {
-    ImU32 color = 0xFFFFFFFF;
+    ImU32 color = DEFAULT_COLOR;
     bool isEnd = false;
     CommentType commentType = CommentType::None;
     std::unordered_map<char, TrieNode*> children;
@@ -128,7 +129,7 @@ public:
     };
     ~Trie() { clear(root); };
 
-    void insert(const std::string& word, ImU32 color = 0xFFFFFFFF, CommentType commentType = CommentType::None)
+    void insert(const std::string& word, ImU32 color = DEFAULT_COLOR, CommentType commentType = CommentType::None)
     {
         TrieNode* node = &root;
         for (auto c : word)
@@ -174,16 +175,16 @@ bool isIdent(char c) { return isalnum(c) || c == '_'; }
 void highlight(const char* str, int strLen,
     const Trie& trie, std::vector<ImTextColorData>& marks)
 {
-    ImU32 color = 0xFFFFFFFF;
+    ImU32 color = DEFAULT_COLOR;
     marks.clear();
-    marks.push_back(ImTextColorData { 0, 0xFFFFFFFF });
+    marks.push_back(ImTextColorData { 0, DEFAULT_COLOR });
     CommentType commentType = CommentType::None;
     bool isBlockComment = false;
 
     for (int i = 0; i < strLen;) {
         if (commentType == CommentType::Line) {
             if (str[i] == '\n') {
-                marks.push_back(ImTextColorData { i, 0xFFFFFFFF });
+                marks.push_back(ImTextColorData { i, DEFAULT_COLOR });
                 commentType = CommentType::None;
             }
             i++;
@@ -202,7 +203,7 @@ void highlight(const char* str, int strLen,
 
             if (commentType == CommentType::BlockEnd) {
                 i += len;
-                marks.push_back(ImTextColorData { i, 0xFFFFFFFF });
+                marks.push_back(ImTextColorData { i, DEFAULT_COLOR });
                 isBlockComment = false;
                 continue;
             }
@@ -219,7 +220,7 @@ void highlight(const char* str, int strLen,
             if (!isIdent(before) && !isIdent(after)) {
                 // output += colors[colorIndex] + line.substr(i, len) + "\033[0m";
                 marks.push_back(ImTextColorData { i, color });
-                marks.push_back(ImTextColorData { i + len, 0xFFFFFFFF });
+                marks.push_back(ImTextColorData { i + len, DEFAULT_COLOR });
                 i += len;
                 continue;
             }
