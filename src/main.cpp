@@ -37,6 +37,38 @@ static std::string textFromFile(const std::filesystem::path& path)
     return sourceCode;
 }
 
+void stylizeImGui()
+{
+    ImGuiStyle& style = ImGui::GetStyle();
+    ImVec4* colors = style.Colors;
+    ImGui::StyleColorsDark();
+    style.WindowRounding = 6.0f;
+    style.FrameRounding = 4.0f;
+    style.ChildRounding = 6.0f;
+    style.PopupRounding = 4.0f;
+    style.GrabRounding = 4.0f;
+    style.ScrollbarRounding = 6.0f;
+    style.WindowBorderSize = 0.0f;
+    style.ItemSpacing = ImVec2(8, 6);
+    style.FramePadding = ImVec2(10, 6);
+    style.ItemInnerSpacing = ImVec2(6, 4);
+    style.IndentSpacing = 20.0f;
+    style.FrameBorderSize = 0.0f;
+    style.WindowTitleAlign = ImVec2(0.5f, 0.5f); // midle title
+    style.WindowMenuButtonPosition = ImGuiDir_None;
+    style.ScrollbarSize = 12.0f;
+    style.GrabMinSize = 10.0f;
+    style.GrabRounding = 4.0f;
+
+    colors[ImGuiCol_TitleBgActive] = ImVec4(0.05f, 0.05f, 0.1f, 0.70f);
+    colors[ImGuiCol_Text] = ImVec4(1, 1, 1, 0.70f);
+    colors[ImGuiCol_WindowBg] = ImVec4(0.0f, 0.0f, 0.0f, 0.10f);
+    colors[ImGuiCol_Button] = ImVec4(0.10f, 0.125f, 0.15f, 1.00f);
+    colors[ImGuiCol_ButtonHovered] = ImVec4(0.30f, 0.35f, 0.40f, 1.00f);
+    colors[ImGuiCol_ButtonActive] = ImVec4(0.40f, 0.45f, 0.50f, 1.00f);
+    colors[ImGuiCol_FrameBg] = ImVec4(0.15f, 0.15f, 0.17f, 1.00f);
+}
+
 // settings
 const unsigned int SCR_WIDTH = 800;
 const unsigned int SCR_HEIGHT = 600;
@@ -84,11 +116,11 @@ class Trie {
 public:
     Trie()
     {
-        insert("int", 0xFF6600FF);
-        insert("hello", 0xFF77BB00);
-        insert("float", 0xFF4455FF);
-        insert("char", 0xFF00AAFF);
-        insert("print", 0xFFFF4455);
+        insert("one", 0xFF6600FF);
+        insert("three", 0xFF00AAFF);
+        insert("two", 0xFF4455FF);
+        insert("four", 0xFF77BB00);
+        insert("five", 0xFFFF4455);
         insert("//", 0xFF666666, CommentType::Line);
         insert("/*", 0xFF666666, CommentType::BlockStart);
         insert("*/", 0xFF666666, CommentType::BlockEnd);
@@ -131,7 +163,7 @@ public:
 
 bool isIdent(char c) { return isalnum(c) || c == '_'; }
 
-void highlight(ImFontBaked* font, const char* str, int strLen,
+void highlight(const char* str, int strLen,
     const Trie& trie, std::vector<ImTextColorData>& marks)
 {
     ImU32 color = 0xFFFFFFFF;
@@ -158,9 +190,8 @@ void highlight(ImFontBaked* font, const char* str, int strLen,
                 marks.push_back(ImTextColorData { i, color });
                 i += len;
                 continue;
-
             }
-            
+
             if (commentType == CommentType::BlockEnd) {
                 i += len;
                 marks.push_back(ImTextColorData { i, 0xFFFFFFFF });
@@ -215,13 +246,18 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height) { glViewport(0, 0, width, height); }
 
+static const Trie trie;
 struct TextEditData {
     std::string text;
     std::vector<ImTextColorData> colorMarks;
-    int prevSize = 0;
-};
 
-static const Trie trie;
+public:
+    TextEditData(const std::string& str)
+        : text(str)
+    {
+        highlight(text.c_str(), text.size(), trie, colorMarks);
+    }
+};
 
 static int InputTextCallback(ImGuiInputTextCallbackData* data)
 {
@@ -230,7 +266,6 @@ static int InputTextCallback(ImGuiInputTextCallbackData* data)
 
     auto textEditData = (TextEditData*)data->UserData;
     std::string& text = textEditData->text;
-    int& prevSize = textEditData->prevSize;
     auto& marks = textEditData->colorMarks;
 
     if (data->EventFlag == ImGuiInputTextFlags_CallbackEdit) {
@@ -243,7 +278,7 @@ static int InputTextCallback(ImGuiInputTextCallbackData* data)
             start--;
         }
 
-        highlight(data->Ctx->Font->LastBaked, data->Buf, data->BufTextLen, trie, marks);
+        highlight(data->Buf, data->BufTextLen, trie, marks);
 
         return 0;
     }
@@ -297,7 +332,7 @@ int main()
         io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // Enable Keyboard Controls
         io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad; // Enable Gamepad Controls
 
-        ImGui::StyleColorsDark();
+        stylizeImGui();
 
         ImGuiStyle& style = ImGui::GetStyle();
         main_scale = 2;
@@ -380,7 +415,7 @@ int main()
         int display_w, display_h;
         glfwGetFramebufferSize(window, &display_w, &display_h);
 
-        glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
+        glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
 
         // draw our first triangle
@@ -424,25 +459,12 @@ int main()
                 first_time = false;
             }
 
-            static TextEditData editData = { "uu int aa float" };
+            static TextEditData editData("one, two, three, four, five");
 
             ImGui::InputTextMultiline("##editor",
                 (char*)editData.text.data(), editData.text.size() + 1,
                 ImVec2(-1, -1), flags, InputTextCallback, (void*)&editData,
                 editData.colorMarks.data(), editData.colorMarks.size());
-
-            //            ImGuiID id = ImGui::GetID("##editor");
-
-            // for (int cmd_i = 0; cmd_i < dl->CmdBuffer.Size; cmd_i++) {
-            //     const ImDrawCmd& cmd = dl->CmdBuffer[cmd_i];
-            //     int vtxCount = cmd.ElemCount; // index count, not vertex count
-            //      if (cmd.TexRef == font->OwnerAtlas->TexID) {
-            //          printf("offset: %d ", cmd.VtxOffset);
-            //          printf("count: %d", cmd.ElemCount);
-            //          printf("\n");
-            //          // vtxOffset = cmd.VtxOffset;
-            //      }
-            // }
 
             if (auto font = ImGui::GetFont()) {
                 if (auto fb = font->LastBaked) {
@@ -450,31 +472,7 @@ int main()
                 }
             }
 
-            // ImGuiWindow* child = ImGui::GetCurrentWindow()->DC.ChildWindows.back();
-            //
-            // auto& vb = child->DrawList->VtxBuffer;
-            //
-            // int numItems = editData.colorMarks.size();
-            // for (int colorMarkIndex = 0; colorMarkIndex < numItems - 1; ++colorMarkIndex) {
-            //     auto& curr = editData.colorMarks[colorMarkIndex];
-            //     auto& next = editData.colorMarks[colorMarkIndex + 1];
-            //     if (curr.colorIndex == 0)
-            //         continue;
-            //
-            //     auto vertexBufSizeAsChar = vb.Size / 4;
-            //     if (curr.pos >= vertexBufSizeAsChar)
-            //         break;
-            //     if (next.pos >= vertexBufSizeAsChar)
-            //         break;
-            //     // assert(curr.pos < editData.text.size() && "curr pos out of range");
-            //     // assert(next.pos < editData.text.size() && "next pos out of range");
-            //
-            //     for (int ci = curr.pos; ci < next.pos; ++ci) {
-            //         for (int vertIndex = 0; vertIndex < 4; ++vertIndex) {
-            //             vb[ci * 4 + vertIndex].col = ImColor(255, 0, 0, 255);
-            //         }
-            //     }
-            // }
+
 
             // printf("%d", window->IDStack.size());
 
