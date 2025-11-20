@@ -142,18 +142,12 @@ public:
     int match(const char* text, ImU32& color, CommentType& commentType) const
     {
         int len = 0;
-        matchInternal(&root, text, color, commentType, len);
-        return len;
-    }
-
-private:
-    const TrieNode* matchInternal(const TrieNode* node, const char* text,
-        ImU32& color, CommentType& commentType, int& len) const
-    {
+        const TrieNode* node = &root;
         while (*text) {
             auto it = node->children.find(*text);
-            if (it == node->children.end())
+            if (it == node->children.end()) {
                 break;
+            }
 
             node = it->second;
             ++len;
@@ -166,7 +160,7 @@ private:
 
         color = node->color;
         commentType = node->commentType;
-        return node;
+        return len;
     }
 };
 
@@ -175,16 +169,24 @@ bool isIdent(char c) { return isalnum(c) || c == '_'; }
 void highlight(const char* str, int strLen,
     const Trie& trie, std::vector<ImTextColorData>& marks)
 {
-    ImU32 color = DEFAULT_COLOR;
     marks.clear();
     marks.push_back(ImTextColorData { 0, DEFAULT_COLOR });
+
+    ImU32 color = DEFAULT_COLOR;
     CommentType commentType = CommentType::None;
     bool isBlockComment = false;
+
+    auto pushMark = [&marks, str](int pos, ImU32 col) {
+        if (marks.back().position == pos)
+            marks.back() = ImTextColorData { pos, col };
+        else if (marks.back().color != col)
+            marks.push_back(ImTextColorData { pos, col });
+    };
 
     for (int i = 0; i < strLen;) {
         if (commentType == CommentType::Line) {
             if (str[i] == '\n') {
-                marks.push_back(ImTextColorData { i, DEFAULT_COLOR });
+                pushMark(i, color);
                 commentType = CommentType::None;
             }
             i++;
@@ -196,14 +198,14 @@ void highlight(const char* str, int strLen,
         if (len > 0) {
             if (commentType == CommentType::Line || commentType == CommentType::BlockStart) {
                 isBlockComment = commentType == CommentType::BlockStart;
-                marks.push_back(ImTextColorData { i, color });
+                pushMark(i, color);
                 i += len;
                 continue;
             }
 
             if (commentType == CommentType::BlockEnd) {
                 i += len;
-                marks.push_back(ImTextColorData { i, DEFAULT_COLOR });
+                pushMark(i, DEFAULT_COLOR);
                 isBlockComment = false;
                 continue;
             }
@@ -218,28 +220,22 @@ void highlight(const char* str, int strLen,
             char after = (end < strLen) ? str[end] : '\0';
 
             if (!isIdent(before) && !isIdent(after)) {
-                // output += colors[colorIndex] + line.substr(i, len) + "\033[0m";
-                marks.push_back(ImTextColorData { i, color });
-                marks.push_back(ImTextColorData { i + len, DEFAULT_COLOR });
+                pushMark(i, color);
+                pushMark(i + len, DEFAULT_COLOR);
+                
                 i += len;
                 continue;
             }
         }
-        //  output += line[i];
-
         i++;
     }
 
-    // for (auto& m : marks) {
-    //     if (m.colorIndex) {
-    //         printf("start: %d, ", m.pos);
-    //     } else {
-    //         printf("end: %d, ", m.pos);
-    //     }
-    // }
+    for (auto& m : marks) {
+        printf("%d, %x, ", m.position, m.color);
+    }
 
-    // if (marks.size())
-    //     printf("\n");
+    if (marks.size())
+        printf("\n");
     // printf("numInvisible %d  ", numInvisible);
 }
 
