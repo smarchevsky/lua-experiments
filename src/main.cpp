@@ -141,7 +141,7 @@ public:
 
     int match(const char* text, ImU32& color, CommentType& commentType) const
     {
-        int len = 0;
+        int len = 0, lenEnd = 0;
         const TrieNode* node = &root;
         while (*text) {
             auto it = node->children.find(*text);
@@ -152,15 +152,17 @@ public:
             node = it->second;
             ++len;
 
-            if (node->isEnd && node->children.empty())
-                break;
-
+            if (node->isEnd) {
+                lenEnd = len;
+                color = node->color;
+                commentType = node->commentType;
+                if (node->children.empty())
+                    break;
+            }
             text++;
         }
 
-        color = node->color;
-        commentType = node->commentType;
-        return len;
+        return lenEnd;
     }
 };
 
