@@ -195,9 +195,23 @@ void highlight(const char* str, int strLen,
             continue;
         }
 
-        int len = trie.match(str + i, color, commentType);
+        if (!isBlockComment) {
+            char* end;
+            const char* start = str + i;
+            strtod(start, &end);
 
-        if (len > 0) {
+            if (int diff = end - start) {
+                char before = (i > 0) ? str[i - 1] : '\0';
+                if (!isIdent(before) && !isIdent(*end)) {
+                    pushMark(i, 0xFFBBFF99);
+                    pushMark(i + diff, DEFAULT_COLOR);
+                    i += diff;
+                    continue;
+                }
+            }
+        }
+
+        if (int len = trie.match(str + i, color, commentType)) {
             if (commentType == CommentType::Line || commentType == CommentType::BlockStart) {
                 isBlockComment = commentType == CommentType::BlockStart;
                 pushMark(i, color);
@@ -224,11 +238,12 @@ void highlight(const char* str, int strLen,
             if (!isIdent(before) && !isIdent(after)) {
                 pushMark(i, color);
                 pushMark(i + len, DEFAULT_COLOR);
-                
+
                 i += len;
                 continue;
             }
         }
+
         i++;
     }
 
