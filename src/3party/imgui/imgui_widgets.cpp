@@ -5578,6 +5578,37 @@ bool ImGui::InputTextEx(const char* label, const char* hint, char* buf, int buf_
             ime_data->InputLineHeight = g.FontSize;
             ime_data->ViewportId = window->Viewport->ID;
         }
+
+        float advX = g.FontBaked->GetCharAdvance(g.FontSize);
+
+        const char* cursor_ptr = buf + state->Stb->cursor;
+        int* it_begin = line_index->Offsets.begin();
+        int* it_end = line_index->Offsets.end();
+        const int* it = ImLowerBound(it_begin, it_end, state->Stb->cursor);
+        if (it > it_begin)
+            if (it == it_end || *it != state->Stb->cursor 
+                || (state != NULL && state->WrapWidth > 0.0f && state->LastMoveDirectionLR == ImGuiDir_Right && cursor_ptr[-1] != '\n' && cursor_ptr[-1] != 0))
+                it--;
+
+        const int line_no = (it == it_begin) ? 0 : line_index->Offsets.index_from_ptr(it);
+
+        char line_index_string[16];
+        int line_index_width = snprintf(line_index_string, sizeof(line_index_string), "%d", line_no + 1);
+
+        ImU32 number_color = ColorConvertFloat4ToU32(style.Colors[ImGuiCol_FrameBg]);
+
+        draw_window->DrawList->AddRectFilled(
+            ImVec2(clip_rect.Max.x - advX * (line_index_width + 4), cursor_screen_rect.Min.y - g.FontSize * 0.1f),
+            ImVec2(clip_rect.Max.x - advX * (1 - 0.5f), cursor_screen_rect.Max.y + g.FontSize * 0.1f), 0x77FFFFFF);
+
+        draw_window->DrawList->VtxBuffer[draw_window->DrawList->VtxBuffer.Size - 1].col = 0;
+        draw_window->DrawList->VtxBuffer[draw_window->DrawList->VtxBuffer.Size - 4].col = 0;
+
+        for (int i = 0; i < line_index_width; ++i) {
+            g.Font->RenderChar(draw_window->DrawList, g.FontSize,
+                ImVec2(clip_rect.Max.x + advX * (i - line_index_width - 1), cursor_screen_rect.Min.y), 
+                number_color, line_index_string[i]);
+        }
     }
 
     if (is_password && !is_displaying_hint)
