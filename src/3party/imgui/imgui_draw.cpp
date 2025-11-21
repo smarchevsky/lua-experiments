@@ -5620,7 +5620,7 @@ void ImFont::RenderChar(ImDrawList* draw_list, float size, const ImVec2& pos, Im
 // DO NOT CALL DIRECTLY THIS WILL CHANGE WILDLY IN 2025-2025. Use ImDrawList::AddText().
 void ImFont::RenderText(ImDrawList* draw_list, float size, const ImVec2& pos, ImU32 col,
     const ImVec4& clip_rect, const char* text_begin, const char* text_end, float wrap_width,
-    ImDrawTextFlags flags, ImTextColorData* color_data, int color_data_num, const char* text_origin_ptr)
+    ImDrawTextFlags flags, const char* text_origin_ptr, const ImTextBoxColorData& text_box_color_data)
 {
     // Align to be pixel perfect
 begin:
@@ -5691,29 +5691,20 @@ begin:
     const ImU32 col_untinted = col | ~IM_COL32_A_MASK;
     const char* word_wrap_eol = NULL;
 
-    // ImTextColorData* color_data, int color_data_num, const char* text_origin_ptr
-
-    // for (int i = 0; i < color_data_num; ++i) 
-    //     printf("pos: %d, col: %x  ", color_data[i].position, color_data[i].color);
-    // if(color_data_num)
-    //     printf("\n");
-
     int color_data_index = 0;
     ImU32 char_color = 0xFFFFFFFF;
 
     while (s < text_end)
     {
-        if (color_data) {
+        if (text_box_color_data.highlight_line_data) {
             int char_index = s - text_origin_ptr;
 
-            while (color_data_index < color_data_num && color_data[color_data_index].position <= char_index) {
-                char_color = color_data[color_data_index].color;
+            while (color_data_index < text_box_color_data.highlight_line_data_num
+                && text_box_color_data.highlight_line_data[color_data_index].position <= char_index) {
+                char_color = text_box_color_data.highlight_line_data[color_data_index].color;
                 color_data_index++;
             }
         }
-
-        // if (color_data_num)
-        //     printf("%x  ", char_color);
 
         if (word_wrap_enabled)
         {
@@ -5806,7 +5797,7 @@ begin:
 
                 // Support for untinted glyphs
                 ImU32 glyph_col = glyph->Colored ? char_color : col;
-                if (color_data)
+                if (text_box_color_data.highlight_line_data)
                     glyph_col = char_color;
 
                 // We are NOT calling PrimRectUV() here because non-inlined causes too much overhead in a debug builds. Inlined here:

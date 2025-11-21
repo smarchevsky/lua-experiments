@@ -118,6 +118,21 @@ public:
     Trie()
     {
         // testing different word endings
+        insert("if", 0xFFFF4455);
+        insert("elseif", 0xFFFF4455);
+        insert("else", 0xFFFF4455);
+        insert("then", 0xFFFF4455);
+        insert("and", 0xFFFF4455);
+        insert("or", 0xFFFF4455);
+        insert("not", 0xFFFF4455);
+        insert("end", 0xFFFF4455);
+        insert("until", 0xFFFF4455);
+        insert("do", 0xFFFF4455);
+        insert("repeat", 0xFFFF4455);
+        insert("in", 0xFFFF4455);
+        insert("for", 0xFFFF4455);
+        insert("function", 0xFFFF4455);
+
         insert("one", 0xFF6600FF);
         insert("onee", 0xFF4455FF);
         insert("oneee", 0xFF00AAFF);
@@ -247,21 +262,18 @@ void highlight(const char* str, int strLen,
         i++;
     }
 
-    for (auto& m : marks) {
-        printf("%d, %x, ", m.position, m.color);
-    }
-
-    if (marks.size())
-        printf("\n");
-    // printf("numInvisible %d  ", numInvisible);
+    // for (auto& m : marks)
+    //     printf("%d, %x, ", m.position, m.color);
+    // if (marks.size())
+    //     printf("\n");
 }
 
 bool windowOpen = true;
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
-    if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
+    if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
         glfwSetWindowShouldClose(window, GLFW_TRUE);
-    else if (key == GLFW_KEY_GRAVE_ACCENT && action == GLFW_PRESS) {
+    } else if (key == GLFW_KEY_GRAVE_ACCENT && action == GLFW_PRESS) {
         windowOpen = !windowOpen;
     }
 }
@@ -482,11 +494,13 @@ int main()
             }
 
             static TextEditData editData("one, onee, oneee, oneeee, oneeeee");
-
+            ImTextBoxColorData colorBoxData;
+            colorBoxData.highlight_line_data = editData.colorMarks.data();
+            colorBoxData.highlight_line_data_num = editData.colorMarks.size();
             ImGui::InputTextMultiline("##editor",
                 (char*)editData.text.data(), editData.text.size() + 1,
                 ImVec2(-1, -1), flags, InputTextCallback, (void*)&editData,
-                editData.colorMarks.data(), editData.colorMarks.size());
+                colorBoxData);
 
             if (auto font = ImGui::GetFont()) {
                 if (auto fb = font->LastBaked) {

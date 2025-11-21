@@ -3934,9 +3934,9 @@ bool ImGui::InputText(const char* label, char* buf, size_t buf_size, ImGuiInputT
     return InputTextEx(label, NULL, buf, (int)buf_size, ImVec2(0, 0), flags, callback, user_data);
 }
 
-bool ImGui::InputTextMultiline(const char* label, char* buf, size_t buf_size, const ImVec2& size, ImGuiInputTextFlags flags, ImGuiInputTextCallback callback, void* user_data, ImTextColorData* color_data, int color_data_num)
+bool ImGui::InputTextMultiline(const char* label, char* buf, size_t buf_size, const ImVec2& size, ImGuiInputTextFlags flags, ImGuiInputTextCallback callback, void* user_data, const ImTextBoxColorData& text_box_color_data)
 {
-    return InputTextEx(label, NULL, buf, (int)buf_size, size, flags | ImGuiInputTextFlags_Multiline, callback, user_data, color_data, color_data_num);
+    return InputTextEx(label, NULL, buf, (int)buf_size, size, flags | ImGuiInputTextFlags_Multiline, callback, user_data, text_box_color_data);
 }
 
 bool ImGui::InputTextWithHint(const char* label, const char* hint, char* buf, size_t buf_size, ImGuiInputTextFlags flags, ImGuiInputTextCallback callback, void* user_data)
@@ -4632,7 +4632,7 @@ static ImVec2 InputTextLineIndexGetPosOffset(ImGuiContext& g, ImGuiInputTextStat
 bool ImGui::InputTextEx(const char* label, const char* hint, char* buf, int buf_size, 
     const ImVec2& size_arg, ImGuiInputTextFlags flags, 
     ImGuiInputTextCallback callback, void* callback_user_data, 
-    ImTextColorData* color_data, int color_data_num)
+    const ImTextBoxColorData& text_box_color_data)
 {
     ImGuiWindow* window = GetCurrentWindow();
     if (window->SkipItems)
@@ -5553,7 +5553,7 @@ bool ImGui::InputTextEx(const char* label, const char* hint, char* buf, int buf_
             line_index->get_line_begin(buf_display, line_visible_n0),
             line_index->get_line_end(buf_display, line_visible_n1 - 1),
             wrap_width, ImDrawTextFlags_WrapKeepBlanks | ImDrawTextFlags_CpuFineClip,
-            color_data, color_data_num, buf_display);
+            buf_display, text_box_color_data);
     }
 
     // Render blinking cursor
