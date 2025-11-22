@@ -5557,8 +5557,7 @@ bool ImGui::InputTextEx(const char* label, const char* hint, char* buf, int buf_
     }
 
     // Render blinking cursor
-    if (render_cursor)
-    {
+    if (render_cursor) {
         state->CursorAnim += io.DeltaTime;
         bool cursor_is_visible = (!g.IO.ConfigInputTextCursorBlink) || (state->CursorAnim <= 0.0f) || ImFmod(state->CursorAnim, 1.20f) <= 0.80f;
         ImVec2 cursor_screen_pos = ImTrunc(draw_pos + cursor_offset - draw_scroll);
@@ -5569,8 +5568,7 @@ bool ImGui::InputTextEx(const char* label, const char* hint, char* buf, int buf_
         // Notify OS of text input position for advanced IME (-1 x offset so that Windows IME can cover our cursor. Bit of an extra nicety.)
         // This is required for some backends (SDL3) to start emitting character/text inputs.
         // As per #6341, make sure we don't set that on the deactivating frame.
-        if (!is_readonly && g.ActiveId == id)
-        {
+        if (!is_readonly && g.ActiveId == id) {
             ImGuiPlatformImeData* ime_data = &g.PlatformImeData; // (this is a public struct, passed to io.Platform_SetImeDataFn() handler)
             ime_data->WantVisible = true;
             ime_data->WantTextInput = true;
@@ -5582,24 +5580,24 @@ bool ImGui::InputTextEx(const char* label, const char* hint, char* buf, int buf_
         float advX = g.FontBaked->GetCharAdvance(g.FontSize);
 
         const char* cursor_ptr = buf + state->Stb->cursor;
-        int* it_begin = line_index->Offsets.begin();
-        int* it_end = line_index->Offsets.end();
-        const int* it = ImLowerBound(it_begin, it_end, state->Stb->cursor);
-        if (it > it_begin)
-            if (it == it_end || *it != state->Stb->cursor 
-                || (state != NULL && state->WrapWidth > 0.0f && state->LastMoveDirectionLR == ImGuiDir_Right && cursor_ptr[-1] != '\n' && cursor_ptr[-1] != 0))
-                it--;
 
-        const int line_no = (it == it_begin) ? 0 : line_index->Offsets.index_from_ptr(it);
+        int count = 0;
+        for (const char *s = buf; *s; ++s) {
+            
+            if (*s == '\n')
+                ++count;
+            if (s > cursor_ptr)
+                break;
+        }
 
         char line_index_string[16];
-        int line_index_width = snprintf(line_index_string, sizeof(line_index_string), "%d", line_no + 1);
+        int line_index_width = snprintf(line_index_string, sizeof(line_index_string), "%d", count + 1);
 
         ImU32 number_color = ColorConvertFloat4ToU32(style.Colors[ImGuiCol_FrameBg]);
 
         draw_window->DrawList->AddRectFilled(
-            ImVec2(clip_rect.Max.x - advX * (line_index_width + 4), cursor_screen_rect.Min.y - g.FontSize * 0.1f),
-            ImVec2(clip_rect.Max.x - advX * (1 - 0.5f), cursor_screen_rect.Max.y + g.FontSize * 0.1f), 0x77FFFFFF);
+            ImVec2(clip_rect.Max.x - advX * (line_index_width + 4), cursor_screen_rect.Min.y - g.FontSize * 0.125f),
+            ImVec2(clip_rect.Max.x - advX * (1 - 0.5f), cursor_screen_rect.Max.y + g.FontSize * 0.125f), 0x77FFFFFF);
 
         draw_window->DrawList->VtxBuffer[draw_window->DrawList->VtxBuffer.Size - 1].col = 0;
         draw_window->DrawList->VtxBuffer[draw_window->DrawList->VtxBuffer.Size - 4].col = 0;
