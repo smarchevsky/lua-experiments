@@ -1,5 +1,6 @@
 
 // #include "lua_functions.h"
+#include "TextEditor.h"
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
@@ -32,7 +33,7 @@ static std::string textFromFile(const std::filesystem::path& path)
         sourceCode = sstr.str();
         codeStream.close();
     } else {
-        printf("Can't open file: %s\n", path.c_str());
+        printf("Can't open file: %ls\n", path.c_str());
     }
     return sourceCode;
 }
@@ -86,254 +87,8 @@ void main()
 )";
 
 #include <iostream>
-#include <unordered_map>
-
-#define ARR_SIZE(x) sizeof(x) / sizeof(x[0])
-const char* colors[] = { "\033[0m", "\033[31m", "\033[32m", "\033[33m", "\033[34m", "\033[35m", "\033[36m", "\033[37m" };
-
-enum class CommentType : uint8_t { None,
-    Line,
-    BlockStart,
-    BlockEnd };
-
-#define DEFAULT_COLOR 0xFFFFFFFF
-struct TrieNode {
-    ImU32 color = DEFAULT_COLOR;
-    bool isEnd = false;
-    CommentType commentType = CommentType::None;
-    std::unordered_map<char, TrieNode*> children;
-};
-
-class Trie {
-    TrieNode root;
-    void clear(TrieNode& n)
-    {
-        for (auto& c : n.children) {
-            clear(*c.second);
-            delete c.second;
-        }
-    }
-
-public:
-    Trie()
-    {
-        // testing different word endings
-        insert("if", 0xFFFF4455);
-        insert("elseif", 0xFFFF4455);
-        insert("else", 0xFFFF4455);
-        insert("then", 0xFFFF4455);
-        insert("and", 0xFFFF4455);
-        insert("or", 0xFFFF4455);
-        insert("not", 0xFFFF4455);
-        insert("end", 0xFFFF4455);
-        insert("until", 0xFFFF4455);
-        insert("do", 0xFFFF4455);
-        insert("repeat", 0xFFFF4455);
-        insert("in", 0xFFFF4455);
-        insert("for", 0xFFFF4455);
-        insert("function", 0xFFFF4455);
-
-        insert("one", 0xFF6600FF);
-        insert("onee", 0xFF4455FF);
-        insert("oneee", 0xFF00AAFF);
-        insert("oneeee", 0xFF77BB00);
-        insert("oneeeee", 0xFFFF4455);
-        insert("--", 0xFF666666, CommentType::Line);
-        insert("--[[", 0xFF666666, CommentType::BlockStart);
-        insert("]]", 0xFF666666, CommentType::BlockEnd);
-    };
-    ~Trie() { clear(root); };
-
-    void insert(const std::string& word, ImU32 color = DEFAULT_COLOR, CommentType commentType = CommentType::None)
-    {
-        TrieNode* node = &root;
-        for (auto c : word)
-            node = node->children[c] ? node->children[c] : (node->children[c] = new TrieNode());
-        node->color = color;
-        node->commentType = commentType;
-        node->isEnd = true;
-    }
-
-    int match(const char* text, ImU32& color, CommentType& commentType) const
-    {
-        int len = 0, lenEnd = 0;
-        const TrieNode* node = &root;
-        while (*text) {
-            auto it = node->children.find(*text);
-            if (it == node->children.end()) {
-                break;
-            }
-
-            node = it->second;
-            ++len;
-
-            if (node->isEnd) {
-                lenEnd = len;
-                color = node->color;
-                commentType = node->commentType;
-                if (node->children.empty())
-                    break;
-            }
-            text++;
-        }
-
-        return lenEnd;
-    }
-};
-
-bool isIdent(char c) { return isalnum(c) || c == '_'; }
-
-void highlight(const char* str, int strLen,
-    const Trie& trie, std::vector<ImTextColorData>& marks)
-{
-    marks.clear();
-    marks.push_back(ImTextColorData { 0, DEFAULT_COLOR });
-
-    ImU32 color = DEFAULT_COLOR;
-    CommentType commentType = CommentType::None;
-    bool isBlockComment = false;
-
-    auto pushMark = [&marks, str](int pos, ImU32 col) {
-        if (marks.back().position == pos)
-            marks.back() = ImTextColorData { pos, col };
-        else if (marks.back().color != col)
-            marks.push_back(ImTextColorData { pos, col });
-    };
-
-    for (int i = 0; i < strLen;) {
-        if (commentType == CommentType::Line) {
-            if (str[i] == '\n') {
-                pushMark(i, color);
-                commentType = CommentType::None;
-            }
-            i++;
-            continue;
-        }
-
-        if (!isBlockComment) {
-            char* end;
-            const char* start = str + i;
-            strtod(start, &end);
-
-            if (int diff = end - start) {
-                char before = (i > 0) ? str[i - 1] : '\0';
-                if (!isIdent(before) && !isIdent(*end)) {
-                    pushMark(i, 0xFFBBFF99);
-                    pushMark(i + diff, DEFAULT_COLOR);
-                    i += diff;
-                    continue;
-                }
-            }
-        }
-
-        if (int len = trie.match(str + i, color, commentType)) {
-            if (commentType == CommentType::Line || commentType == CommentType::BlockStart) {
-                isBlockComment = commentType == CommentType::BlockStart;
-                pushMark(i, color);
-                i += len;
-                continue;
-            }
-
-            if (commentType == CommentType::BlockEnd) {
-                i += len;
-                pushMark(i, DEFAULT_COLOR);
-                isBlockComment = false;
-                continue;
-            }
-
-            if (isBlockComment) {
-                i++;
-                continue;
-            }
-
-            int end = i + len;
-            char before = (i > 0) ? str[i - 1] : '\0';
-            char after = (end < strLen) ? str[end] : '\0';
-
-            if (!isIdent(before) && !isIdent(after)) {
-                pushMark(i, color);
-                pushMark(i + len, DEFAULT_COLOR);
-
-                i += len;
-                continue;
-            }
-        }
-
-        i++;
-    }
-
-    // for (auto& m : marks)
-    //     printf("%d, %x, ", m.position, m.color);
-    // if (marks.size())
-    //     printf("\n");
-}
-
-bool windowOpen = true;
-void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
-{
-    if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
-        glfwSetWindowShouldClose(window, GLFW_TRUE);
-    } else if (key == GLFW_KEY_GRAVE_ACCENT && action == GLFW_PRESS) {
-        windowOpen = !windowOpen;
-    }
-}
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height) { glViewport(0, 0, width, height); }
-
-static const Trie trie;
-struct TextEditData {
-    std::string text;
-    std::vector<ImTextColorData> colorMarks;
-
-public:
-    TextEditData(const std::string& str)
-        : text(str)
-    {
-        highlight(text.c_str(), text.size(), trie, colorMarks);
-    }
-};
-
-static int InputTextCallback(ImGuiInputTextCallbackData* data)
-{
-    if (!data)
-        return 1;
-
-    auto textEditData = (TextEditData*)data->UserData;
-    std::string& text = textEditData->text;
-    auto& marks = textEditData->colorMarks;
-
-    if (data->EventFlag == ImGuiInputTextFlags_CallbackEdit) {
-        int start = data->CursorPos - 1;
-        auto& buf = data->Buf;
-
-        while (start >= 0) {
-            if (!isIdent(buf[start]))
-                break;
-            start--;
-        }
-
-        highlight(data->Buf, data->BufTextLen, trie, marks);
-
-        return 0;
-    }
-
-    if (data->EventFlag == ImGuiInputTextFlags_CallbackCharFilter) {
-        if (data->EventChar == '`') {
-            windowOpen = !windowOpen;
-            return 1;
-        }
-    }
-
-    if (data->EventFlag == ImGuiInputTextFlags_CallbackResize) {
-        if (data->BufTextLen > text.capacity()) {
-            text.resize(data->BufTextLen + 4);
-            data->Buf = text.data();
-            return 0;
-        }
-    }
-
-    return 0;
-}
 
 int main()
 {
@@ -356,13 +111,22 @@ int main()
         return -1;
     }
 
-    glfwSetKeyCallback(window, key_callback);
+    // glfwSetKeyCallback(window, key_callback);
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
     {
         IMGUI_CHECKVERSION();
         ImGui::CreateContext();
         ImGuiIO& io = ImGui::GetIO();
-        (void)io;
+#if 0
+        auto t0 = std::chrono::high_resolution_clock::now();
+        ImFont* myFont = io.Fonts->AddFontFromFileTTF(
+            "../../proggyfonts/ProggyDotted/ProggyDotted Regular.ttf",
+            18.0f);
+        auto t1 = std::chrono::high_resolution_clock::now() - t0;
+        printf("font parsing %llu", std::chrono::duration_cast<std::chrono::microseconds>(t1).count());
+        assert(myFont && "no font");
+#endif
+
         io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // Enable Keyboard Controls
         io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad; // Enable Gamepad Controls
 
@@ -444,6 +208,9 @@ int main()
 
     bool first_time = true;
 
+    TextEditor te;
+    te.SetLanguageDefinition(TextEditor::LanguageDefinition::C());
+
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();
         int display_w, display_h;
@@ -476,56 +243,9 @@ int main()
 
             ImGui::SetNextWindowPos(ImVec2(40, 40));
             ImGui::SetNextWindowSize(ImVec2(display_w - 80, display_h - 80));
-            ImGui::Begin("Multicolor text editor", &windowOpen, flags);
+            ImGui::Begin("Multicolor text editor", nullptr, flags);
 
-            // ImGui::Text("This is some useful text.");
-            flags = 0
-                | ImGuiInputTextFlags_WordWrap
-                | ImGuiInputTextFlags_CallbackResize
-                | ImGuiInputTextFlags_CallbackEdit
-                | ImGuiInputTextFlags_NoHorizontalScroll
-                | ImGuiInputTextFlags_AllowTabInput
-                | ImGuiInputTextFlags_CallbackCharFilter;
-
-            if (first_time) {
-                // 1. Set the flag to true for the next item
-                ImGui::SetKeyboardFocusHere();
-                first_time = false;
-            }
-
-            static TextEditData editData("one, onee, oneee, oneeee, oneeeee");
-            ImTextBoxColorData colorBoxData;
-            colorBoxData.highlight_line_data = editData.colorMarks.data();
-            colorBoxData.highlight_line_data_num = editData.colorMarks.size();
-            ImGui::InputTextMultiline("##editor",
-                (char*)editData.text.data(), editData.text.size() + 1,
-                ImVec2(-1, -1), flags, InputTextCallback, (void*)&editData,
-                colorBoxData);
-
-            if (auto font = ImGui::GetFont()) {
-                if (auto fb = font->LastBaked) {
-                    // printf("%d\n", fb->FindGlyph('c')->Visible);
-                }
-            }
-
-            // printf("%d", window->IDStack.size());
-
-            // IDStack
-
-            // printf("%p ", child);
-            //  ImDrawList* dl = child->DrawList;
-
-            // for (int i = start; i < end; ++i) {
-            //     if (i >= 0 && i < draw_list->VtxBuffer.size())
-            //         draw_list->VtxBuffer[i].col = ImColor(255, 0, 0, 255);
-            // }
-
-            // for (int i = 0; i < draw_list->VtxBuffer.size(); ++i) {
-            //     draw_list->VtxBuffer[i].col = ImColor(255, 0, 0, 255);
-            // }
-
-            // printf("%d %d\n", start, end);
-
+            te.Render("code", ImVec2(-1, -1), true);
             // ImGui::SliderFloat("float", &f, 0.0f, 1.0f);
             // ImGui::ColorEdit3("clear color", (float*)&clear_color);
             // if (ImGui::Button("Button"))
