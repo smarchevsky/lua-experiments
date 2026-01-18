@@ -90,6 +90,16 @@ void main()
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height) { glViewport(0, 0, width, height); }
 
+bool windowOpen = true;
+void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
+{
+    if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
+        glfwSetWindowShouldClose(window, GLFW_TRUE);
+    } else if (key == GLFW_KEY_GRAVE_ACCENT && action == GLFW_PRESS) {
+        windowOpen = !windowOpen;
+    }
+}
+
 int main()
 {
     glfwInit();
@@ -97,8 +107,9 @@ int main()
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-    float main_scale = ImGui_ImplGlfw_GetContentScaleForMonitor(glfwGetPrimaryMonitor()); // Valid on GLFW 3.3+ only
-    GLFWwindow* window = glfwCreateWindow((int)(800 * main_scale), (int)(600 * main_scale), "Dear ImGui GLFW+OpenGL3 example", nullptr, nullptr);
+    auto primaryMonitor = glfwGetPrimaryMonitor();
+    const GLFWvidmode* mode = glfwGetVideoMode(primaryMonitor);
+    GLFWwindow* window = glfwCreateWindow(mode->width, mode->width, "Dear ImGui GLFW+OpenGL3 example", nullptr, nullptr);
 
     if (window == nullptr)
         return 1;
@@ -111,7 +122,7 @@ int main()
         return -1;
     }
 
-    // glfwSetKeyCallback(window, key_callback);
+    glfwSetKeyCallback(window, key_callback);
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
     {
         IMGUI_CHECKVERSION();
@@ -133,6 +144,7 @@ int main()
         stylizeImGui();
 
         ImGuiStyle& style = ImGui::GetStyle();
+        float main_scale = ImGui_ImplGlfw_GetContentScaleForMonitor(primaryMonitor);
         main_scale = 2;
         style.ScaleAllSizes(main_scale);
         style.FontScaleDpi = main_scale;
@@ -143,6 +155,8 @@ int main()
 
     unsigned int VBO, VAO;
     unsigned int shaderProgram;
+
+#pragma region opengl_setup
     {
         unsigned int vertexShader = glCreateShader(GL_VERTEX_SHADER);
         glShaderSource(vertexShader, 1, &vertexShaderSource, NULL);
@@ -205,6 +219,7 @@ int main()
         glBindBuffer(GL_ARRAY_BUFFER, 0);
         glBindVertexArray(0);
     }
+#pragma endregion
 
     bool first_time = true;
 
@@ -241,19 +256,15 @@ int main()
                 // | ImGuiWindowFlags_NoSavedSettings
                 ;
 
-            ImGui::SetNextWindowPos(ImVec2(40, 40));
-            ImGui::SetNextWindowSize(ImVec2(display_w - 80, display_h - 80));
-            ImGui::Begin("Multicolor text editor", nullptr, flags);
+            if (windowOpen) {
+                ImGui::SetNextWindowPos(ImVec2(40, 40));
+                ImGui::SetNextWindowSize(ImVec2(display_w - 80, display_h - 80));
+                ImGui::Begin("Multicolor text editor", nullptr, flags);
 
-            te.Render("code", ImVec2(-1, -1), true);
-            // ImGui::SliderFloat("float", &f, 0.0f, 1.0f);
-            // ImGui::ColorEdit3("clear color", (float*)&clear_color);
-            // if (ImGui::Button("Button"))
-            //     counter++;
-            // ImGui::SameLine();
-            // ImGui::Text("counter = %d", counter);
-            // ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
-            ImGui::End();
+                te.Render("code", ImVec2(-1, -1), true);
+
+                ImGui::End();
+            }
 
             ImGui::Render();
 
