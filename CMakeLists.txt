@@ -22,18 +22,14 @@ target_include_directories(${PROJECT_NAME} PRIVATE
 )
 
 
-
-
+if(NOT WIN32)
 target_link_libraries(${PROJECT_NAME} glfw GL lua)
-
-
-
 include(GNUInstallDirs)
 install(TARGETS ${PROJECT_NAME}
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
-
+endif()
 
 
 
