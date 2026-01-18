@@ -50,10 +50,6 @@ void stylizeImGui()
     colors[ImGuiCol_FrameBg] = ImVec4(0.15f, 0.15f, 0.17f, 1.00f);
 }
 
-// settings
-const unsigned int SCR_WIDTH = 800;
-const unsigned int SCR_HEIGHT = 600;
-
 #include <iostream>
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height) { glv(width, height); }
@@ -96,9 +92,7 @@ int main()
         ImGuiIO& io = ImGui::GetIO();
 #if 0
         auto t0 = std::chrono::high_resolution_clock::now();
-        ImFont* myFont = io.Fonts->AddFontFromFileTTF(
-            "../../proggyfonts/ProggyDotted/ProggyDotted Regular.ttf",
-            18.0f);
+        ImFont* myFont = io.Fonts->AddFontFromFileTTF("../../proggyfonts/ProggyDotted/ProggyDotted Regular.ttf", 18.0f);
         auto t1 = std::chrono::high_resolution_clock::now() - t0;
         printf("font parsing %llu", std::chrono::duration_cast<std::chrono::microseconds>(t1).count());
         assert(myFont && "no font");
@@ -121,8 +115,6 @@ int main()
 
     initGL();
 
-    bool first_time = true;
-
     TextEditor te;
     te.SetLanguageDefinition(TextEditor::LanguageDefinition::C());
 
@@ -134,9 +126,6 @@ int main()
         clear();
         draw();
 
-        /////////////////////////////////////////////////////////////////////////////////////////
-
-        // static bool wind
         {
             ImGui_ImplOpenGL3_NewFrame();
             ImGui_ImplGlfw_NewFrame();
@@ -162,7 +151,6 @@ int main()
             ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
         }
 
-        /////////////////////////////////////////////////////////////////////////////////////////
         glfwSwapBuffers(window);
         fflush(stdout);
     }
