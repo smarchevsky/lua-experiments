@@ -1128,6 +1128,8 @@ void TextEditor::Render(const char* aTitle, const ImVec2& aSize, bool aBorder)
 	if (!mIgnoreImGuiChild)
 		ImGui::BeginChild(aTitle, aSize, aBorder, ImGuiWindowFlags_HorizontalScrollbar | ImGuiWindowFlags_AlwaysHorizontalScrollbar | ImGuiWindowFlags_NoMove);
 
+	ImGui::SetWindowFocus();
+
 	if (mHandleKeyboardInputs)
 	{
 		HandleKeyboardInputs();
